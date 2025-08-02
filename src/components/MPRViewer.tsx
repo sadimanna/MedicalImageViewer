@@ -14,6 +14,19 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
     maskFile,
     imageWindowLevel,
     maskWindowLevel,
+    // Per-plane flip state and setters
+    flipHorizontalAxial,
+    flipVerticalAxial,
+    flipHorizontalSagittal,
+    flipVerticalSagittal,
+    flipHorizontalCoronal,
+    flipVerticalCoronal,
+    setFlipHorizontalAxial,
+    setFlipVerticalAxial,
+    setFlipHorizontalSagittal,
+    setFlipVerticalSagittal,
+    setFlipHorizontalCoronal,
+    setFlipVerticalCoronal
   } = useViewerStore();
 
   // Independent slice indices for each plane
@@ -139,8 +152,25 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
     }
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2;
+    ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(offscreenCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
+    // Per-plane flipping logic (corrected)
+    let flipX = 1, flipY = 1, transX = 0, transY = 0;
+    if (orientation === 'axial') {
+      flipX = flipHorizontalAxial ? -1 : 1;
+      flipY = flipVerticalAxial ? -1 : 1;
+    } else if (orientation === 'sagittal') {
+      flipX = flipHorizontalSagittal ? -1 : 1;
+      flipY = flipVerticalSagittal ? -1 : 1;
+    } else if (orientation === 'coronal') {
+      flipX = flipHorizontalCoronal ? -1 : 1;
+      flipY = flipVerticalCoronal ? -1 : 1;
+    }
+    ctx.translate(offsetX, offsetY);
+    if (flipX === -1) ctx.translate(scaledWidth, 0);
+    if (flipY === -1) ctx.translate(0, scaledHeight);
+    ctx.scale(flipX, flipY);
+    ctx.drawImage(offscreenCanvas, 0, 0, scaledWidth, scaledHeight);
     if (maskFile) {
         const { sliceData: maskSliceData } = extractSlice(
             maskFile.data.pixelData, maskFile.data.dimensions, sliceIndex, orientation
@@ -171,10 +201,11 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
               }
             }
             maskCtx.putImageData(maskImageData, 0, 0);
-            ctx.drawImage(maskOffscreenCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
+            ctx.drawImage(maskOffscreenCanvas, 0, 0, scaledWidth, scaledHeight);
         }
     }
-  }, [imageFile, maskFile, imageWindowLevel, maskWindowLevel, applyWindowLevel, extractSlice]);
+    ctx.restore();
+  }, [imageFile, maskFile, imageWindowLevel, maskWindowLevel, applyWindowLevel, extractSlice, flipHorizontalAxial, flipVerticalAxial, flipHorizontalSagittal, flipVerticalSagittal, flipHorizontalCoronal, flipVerticalCoronal]);
 
   useEffect(() => {
     if (!imageFile) return;
@@ -203,18 +234,36 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
         <div className="mpr-view">
           <h4>Axial</h4>
           <canvas ref={axialCanvasRef} width={256} height={256} style={{ border: '1px solid #e0e0e0', borderRadius: '2px' }} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+            <button onClick={() => setFlipVerticalAxial(!flipVerticalAxial)} title="Flip Vertically" style={{ margin: '0 4px' }}>↑</button>
+            <button onClick={() => setFlipHorizontalAxial(!flipHorizontalAxial)} title="Flip Horizontally" style={{ margin: '0 4px' }}>←</button>
+            <button onClick={() => setFlipHorizontalAxial(!flipHorizontalAxial)} title="Flip Horizontally" style={{ margin: '0 4px' }}>→</button>
+            <button onClick={() => setFlipVerticalAxial(!flipVerticalAxial)} title="Flip Vertically" style={{ margin: '0 4px' }}>↓</button>
+          </div>
           <input type="range" min={0} max={depth - 1} value={axialSlice} onChange={e => setAxialSlice(Number(e.target.value))} />
           <div style={{ fontSize: '0.7rem', textAlign: 'center' }}>Slice {axialSlice + 1} / {depth}</div>
         </div>
         <div className="mpr-view">
           <h4>Sagittal</h4>
           <canvas ref={sagittalCanvasRef} width={256} height={256} style={{ border: '1px solid #e0e0e0', borderRadius: '2px' }} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+            <button onClick={() => setFlipVerticalSagittal(!flipVerticalSagittal)} title="Flip Vertically" style={{ margin: '0 4px' }}>↑</button>
+            <button onClick={() => setFlipHorizontalSagittal(!flipHorizontalSagittal)} title="Flip Horizontally" style={{ margin: '0 4px' }}>←</button>
+            <button onClick={() => setFlipHorizontalSagittal(!flipHorizontalSagittal)} title="Flip Horizontally" style={{ margin: '0 4px' }}>→</button>
+            <button onClick={() => setFlipVerticalSagittal(!flipVerticalSagittal)} title="Flip Vertically" style={{ margin: '0 4px' }}>↓</button>
+          </div>
           <input type="range" min={0} max={width - 1} value={sagittalSlice} onChange={e => setSagittalSlice(Number(e.target.value))} />
           <div style={{ fontSize: '0.7rem', textAlign: 'center' }}>Slice {sagittalSlice + 1} / {width}</div>
         </div>
         <div className="mpr-view">
           <h4>Coronal</h4>
           <canvas ref={coronalCanvasRef} width={256} height={256} style={{ border: '1px solid #e0e0e0', borderRadius: '2px' }} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+            <button onClick={() => setFlipVerticalCoronal(!flipVerticalCoronal)} title="Flip Vertically" style={{ margin: '0 4px' }}>↑</button>
+            <button onClick={() => setFlipHorizontalCoronal(!flipHorizontalCoronal)} title="Flip Horizontally" style={{ margin: '0 4px' }}>←</button>
+            <button onClick={() => setFlipHorizontalCoronal(!flipHorizontalCoronal)} title="Flip Horizontally" style={{ margin: '0 4px' }}>→</button>
+            <button onClick={() => setFlipVerticalCoronal(!flipVerticalCoronal)} title="Flip Vertically" style={{ margin: '0 4px' }}>↓</button>
+          </div>
           <input type="range" min={0} max={height - 1} value={coronalSlice} onChange={e => setCoronalSlice(Number(e.target.value))} />
           <div style={{ fontSize: '0.7rem', textAlign: 'center' }}>Slice {coronalSlice + 1} / {height}</div>
         </div>

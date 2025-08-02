@@ -46,7 +46,11 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     imageWindowLevel,
     maskWindowLevel,
     zoom,
-    pan
+    pan,
+    flipHorizontal2D,
+    flipVertical2D,
+    setFlipHorizontal2D,
+    setFlipVertical2D
   } = useViewerStore();
 
   // Update canvas size based on container and image dimensions
@@ -266,19 +270,21 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const offsetX = (canvasSize.width - scaledWidth) / 2 + pan.x;
     const offsetY = (canvasSize.height - scaledHeight) / 2 + pan.y;
 
+    // Flipping logic (corrected)
+    let flipX = flipHorizontal2D ? -1 : 1;
+    let flipY = flipVertical2D ? -1 : 1;
     ctx.translate(offsetX, offsetY);
-    ctx.scale(scale, scale);
+    if (flipX === -1) ctx.translate(scaledWidth, 0);
+    if (flipY === -1) ctx.translate(0, scaledHeight);
+    ctx.scale(flipX * scale, flipY * scale);
 
     // Draw the image from its off-screen canvas
     ctx.drawImage(imageCanvas, 0, 0);
-
-    // Draw the mask from its off-screen canvas
     if (maskCanvas) {
       ctx.drawImage(maskCanvas, 0, 0);
     }
-
     ctx.restore();
-  }, [imageFile, maskFile, currentSlice, imageWindowLevel, maskWindowLevel, zoom, pan, canvasSize, extractSlice]);
+  }, [imageFile, maskFile, currentSlice, imageWindowLevel, maskWindowLevel, zoom, pan, canvasSize, extractSlice, flipHorizontal2D, flipVertical2D]);
 
   // Handle mouse interactions
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -349,30 +355,20 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
   }
 
   return (
-    <div 
-      ref={containerRef}
-      style={{ 
-        width: '100%', 
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden'
-      }}
-    >
+    <div ref={containerRef} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexDirection: 'column' }}>
       <canvas
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        style={{
-          border: '1px solid #ccc',
-          cursor: 'grab',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          objectFit: 'contain'
-        }}
+        style={{ border: '1px solid #ccc', cursor: 'grab', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
         onMouseDown={handleMouseDown}
       />
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+        <button onClick={() => setFlipVertical2D(!flipVertical2D)} title="Flip Vertically" style={{ margin: '0 4px' }}>↑</button>
+        <button onClick={() => setFlipHorizontal2D(!flipHorizontal2D)} title="Flip Horizontally" style={{ margin: '0 4px' }}>←</button>
+        <button onClick={() => setFlipHorizontal2D(!flipHorizontal2D)} title="Flip Horizontally" style={{ margin: '0 4px' }}>→</button>
+        <button onClick={() => setFlipVertical2D(!flipVertical2D)} title="Flip Vertically" style={{ margin: '0 4px' }}>↓</button>
+      </div>
     </div>
   );
 }; 

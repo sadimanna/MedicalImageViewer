@@ -26,6 +26,17 @@ interface ViewerState {
   
   // View mode
   viewMode: '2D' | 'MPR' | '3D';
+  
+  // Flip controls
+  flipHorizontal2D: boolean;
+  flipVertical2D: boolean;
+  // Per-plane MPR flip
+  flipHorizontalAxial: boolean;
+  flipVerticalAxial: boolean;
+  flipHorizontalSagittal: boolean;
+  flipVerticalSagittal: boolean;
+  flipHorizontalCoronal: boolean;
+  flipVerticalCoronal: boolean;
 }
 
 interface ViewerActions {
@@ -56,6 +67,17 @@ interface ViewerActions {
   
   // Reset view
   resetView: () => void;
+  
+  // Flip controls
+  setFlipHorizontal2D: (flip: boolean) => void;
+  setFlipVertical2D: (flip: boolean) => void;
+  // Per-plane MPR flip
+  setFlipHorizontalAxial: (flip: boolean) => void;
+  setFlipVerticalAxial: (flip: boolean) => void;
+  setFlipHorizontalSagittal: (flip: boolean) => void;
+  setFlipVerticalSagittal: (flip: boolean) => void;
+  setFlipHorizontalCoronal: (flip: boolean) => void;
+  setFlipVerticalCoronal: (flip: boolean) => void;
 }
 
 export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
@@ -71,6 +93,15 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
   zoom: 1,
   pan: { x: 0, y: 0 },
   viewMode: '2D',
+  flipHorizontal2D: false,
+  flipVertical2D: false,
+  // Per-plane MPR flip
+  flipHorizontalAxial: false,
+  flipVerticalAxial: false,
+  flipHorizontalSagittal: false,
+  flipVerticalSagittal: false,
+  flipHorizontalCoronal: false,
+  flipVerticalCoronal: false,
   
   // Actions
   setImageFile: async (file) => {
@@ -156,5 +187,15 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
       zoom: 1,
       pan: { x: 0, y: 0 }
     });
-  }
+  },
+  
+  setFlipHorizontal2D: (flip) => set({ flipHorizontal2D: flip }),
+  setFlipVertical2D: (flip) => set({ flipVertical2D: flip }),
+  // Per-plane MPR flip
+  setFlipHorizontalAxial: (flip) => set({ flipHorizontalAxial: flip }),
+  setFlipVerticalAxial: (flip) => set({ flipVerticalAxial: flip }),
+  setFlipHorizontalSagittal: (flip) => set({ flipHorizontalSagittal: flip }),
+  setFlipVerticalSagittal: (flip) => set({ flipVerticalSagittal: flip }),
+  setFlipHorizontalCoronal: (flip) => set({ flipHorizontalCoronal: flip }),
+  setFlipVerticalCoronal: (flip) => set({ flipVerticalCoronal: flip }),
 })); 

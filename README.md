@@ -157,16 +157,41 @@ To add support for a new file format:
 - **Debounced Updates**: Smooth UI interactions
 - **Memory Management**: Proper cleanup of large objects
 
-<!-- ## Deployment
+## Running as a Browser App
 
-The application is designed to run entirely in the browser, making it perfect for static hosting:
+This application is designed to run entirely in your web browser. You can use it locally during development, or build it for production and deploy it to any static hosting service (such as Vercel, Netlify, GitHub Pages, or your own server).
 
-### Recommended Hosting Options
+### Local Development
 
-- **Vercel**: Zero-config deployment
-- **Netlify**: Easy static site hosting
-- **GitHub Pages**: Free hosting for open source projects
-- **AWS S3 + CloudFront**: Scalable static hosting -->
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+3. Open your browser and go to [http://localhost:5173](http://localhost:5173)
+
+### Production Build & Static Hosting
+
+1. Build the app:
+   ```bash
+   npm run build
+   ```
+2. The production-ready files will be in the `dist/` directory.
+3. You can now deploy the contents of `dist/` to any static file server or static hosting provider, for example:
+   - **Vercel**: `vercel --prod`
+   - **Netlify**: Drag and drop the `dist/` folder in the Netlify dashboard
+   - **GitHub Pages**: Push the contents of `dist/` to your `gh-pages` branch
+   - **Python HTTP server (for local testing):**
+     ```bash
+     cd dist
+     python3 -m http.server 8080
+     # Then open http://localhost:8080 in your browser
+     ```
+
+No backend or server-side code is required. All processing is done client-side in your browser.
 
 ### Environment Variables
 
