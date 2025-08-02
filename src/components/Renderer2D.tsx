@@ -1,0 +1,323 @@
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { useViewerStore } from '../store/viewerStore';
+
+interface Renderer2DProps {
+  width?: number;
+  height?: number;
+}
+
+export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height: propHeight }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 512, height: 512 });
+  
+  const {
+    imageFile,
+    maskFile,
+    currentSlice,
+    imageWindowLevel,
+    maskWindowLevel,
+    zoom,
+    pan
+  } = useViewerStore();
+
+  // Update canvas size based on container and image dimensions
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (containerRef.current && imageFile) {
+        const container = containerRef.current;
+        const rect = container.getBoundingClientRect();
+        const containerWidth = rect.width - 20; // Account for padding
+        const containerHeight = rect.height - 20;
+        
+        // Get image dimensions
+        const imageWidth = imageFile.data.dimensions[0];
+        const imageHeight = imageFile.data.dimensions[1];
+        
+        // Calculate optimal size based on image dimensions
+        let optimalWidth = imageWidth;
+        let optimalHeight = imageHeight;
+        
+        // If image is larger than container, scale it down
+        if (optimalWidth > containerWidth || optimalHeight > containerHeight) {
+          const scaleX = containerWidth / optimalWidth;
+          const scaleY = containerHeight / optimalHeight;
+          const scale = Math.min(scaleX, scaleY);
+          optimalWidth = Math.floor(optimalWidth * scale);
+          optimalHeight = Math.floor(optimalHeight * scale);
+        }
+        
+        // Ensure minimum size of 512x512
+        const finalWidth = Math.max(512, optimalWidth);
+        const finalHeight = Math.max(512, optimalHeight);
+        
+        // If the calculated size exceeds container, scale down while maintaining minimum
+        if (finalWidth > containerWidth || finalHeight > containerHeight) {
+          const scaleX = containerWidth / finalWidth;
+          const scaleY = containerHeight / finalHeight;
+          const scale = Math.min(scaleX, scaleY);
+          const scaledWidth = Math.floor(finalWidth * scale);
+          const scaledHeight = Math.floor(finalHeight * scale);
+          
+          // Ensure we don't go below 512x512
+          setCanvasSize({
+            width: Math.max(512, scaledWidth),
+            height: Math.max(512, scaledHeight)
+          });
+        } else {
+          setCanvasSize({
+            width: finalWidth,
+            height: finalHeight
+          });
+        }
+      } else if (containerRef.current) {
+        // No image loaded, use default 512x512
+        const container = containerRef.current;
+        const rect = container.getBoundingClientRect();
+        const containerWidth = rect.width - 20;
+        const containerHeight = rect.height - 20;
+        
+        const targetSize = Math.min(512, containerWidth, containerHeight);
+        setCanvasSize({ width: targetSize, height: targetSize });
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, [imageFile, propWidth, propHeight]);
+
+  const applyWindowLevel = useCallback((pixelValue: number, _min: number, _max: number, windowLevel: { center: number; width: number }): number => {
+    const { center, width: wl } = windowLevel;
+    const windowMin = center - wl / 2;
+    const windowMax = center + wl / 2;
+    
+    // Clamp the pixel value to the window range
+    if (pixelValue <= windowMin) return 0;
+    if (pixelValue >= windowMax) return 255;
+    
+    // Linear mapping from window range to 0-255
+    return Math.round(((pixelValue - windowMin) / (windowMax - windowMin)) * 255);
+  }, []);
+
+  const extractSlice = useCallback((data: Uint8Array | Uint16Array | Float32Array, dimensions: [number, number, number], sliceIndex: number, windowLevel: { center: number; width: number }): { sliceData: Uint8Array, min: number, max: number } => {
+    const [width, height] = dimensions;
+    const sliceSize = width * height;
+    const startIndex = sliceIndex * sliceSize;
+    
+    const sliceData = new Uint8Array(sliceSize);
+    let min = Infinity;
+    let max = -Infinity;
+    
+    // First pass: find min/max values
+    for (let i = 0; i < sliceSize; i++) {
+      const sourceIndex = startIndex + i;
+      if (sourceIndex < data.length) {
+        const value = data[sourceIndex];
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+      }
+    }
+    
+    // Second pass: apply window/level
+    for (let i = 0; i < sliceSize; i++) {
+      const sourceIndex = startIndex + i;
+      if (sourceIndex < data.length) {
+        const pixelValue = data[sourceIndex];
+        sliceData[i] = applyWindowLevel(pixelValue, min, max, windowLevel);
+      }
+    }
+    
+    return { sliceData, min, max };
+  }, [applyWindowLevel]);
+
+  const renderSlice = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !imageFile) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    const imageWidth = imageFile.data.dimensions[0];
+    const imageHeight = imageFile.data.dimensions[1];
+
+    // Create an off-screen canvas for the image slice
+    const imageCanvas = document.createElement('canvas');
+    imageCanvas.width = imageWidth;
+    imageCanvas.height = imageHeight;
+    const imageCtx = imageCanvas.getContext('2d');
+    if (!imageCtx) return;
+
+    const { sliceData } = extractSlice(
+      imageFile.data.pixelData,
+      imageFile.data.dimensions,
+      currentSlice,
+      imageWindowLevel
+    );
+
+    const imageData = imageCtx.createImageData(imageWidth, imageHeight);
+    for (let i = 0; i < sliceData.length; i++) {
+      const pixelIndex = i * 4;
+      const value = sliceData[i];
+      imageData.data[pixelIndex] = value;     // R
+      imageData.data[pixelIndex + 1] = value; // G
+      imageData.data[pixelIndex + 2] = value; // B
+      imageData.data[pixelIndex + 3] = 255;   // A
+    }
+    imageCtx.putImageData(imageData, 0, 0);
+
+    // Create an off-screen canvas for the mask slice
+    let maskCanvas: HTMLCanvasElement | null = null;
+    if (maskFile && maskFile.data.dimensions[2] > currentSlice) {
+      maskCanvas = document.createElement('canvas');
+      maskCanvas.width = imageWidth;
+      maskCanvas.height = imageHeight;
+      const maskCtx = maskCanvas.getContext('2d');
+      if (maskCtx) {
+        const maskResult = extractSlice(
+          maskFile.data.pixelData,
+          maskFile.data.dimensions,
+          currentSlice,
+          maskWindowLevel
+        );
+        const maskImageData = maskCtx.createImageData(imageWidth, imageHeight);
+        for (let i = 0; i < maskResult.sliceData.length; i++) {
+          const pixelIndex = i * 4;
+          if (maskResult.sliceData[i] > 0) {
+            maskImageData.data[pixelIndex] = 255;     // R
+            maskImageData.data[pixelIndex + 1] = 0;   // G
+            maskImageData.data[pixelIndex + 2] = 0;   // B
+            maskImageData.data[pixelIndex + 3] = 102; // A (40% opacity)
+          }
+        }
+        maskCtx.putImageData(maskImageData, 0, 0);
+      }
+    }
+
+    // Now, apply transformations and draw to the visible canvas
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Use nearest-neighbor for sharp pixels
+
+    const scaleX = canvasSize.width / imageWidth;
+    const scaleY = canvasSize.height / imageHeight;
+    const scale = Math.min(scaleX, scaleY) * zoom;
+    
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+    const offsetX = (canvasSize.width - scaledWidth) / 2 + pan.x;
+    const offsetY = (canvasSize.height - scaledHeight) / 2 + pan.y;
+
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    // Draw the image from its off-screen canvas
+    ctx.drawImage(imageCanvas, 0, 0);
+
+    // Draw the mask from its off-screen canvas
+    if (maskCanvas) {
+      ctx.drawImage(maskCanvas, 0, 0);
+    }
+
+    ctx.restore();
+  }, [imageFile, maskFile, currentSlice, imageWindowLevel, maskWindowLevel, zoom, pan, canvasSize, extractSlice]);
+
+  // Handle mouse interactions
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let isDragging = false;
+    let lastX = e.clientX;
+    let lastY = e.clientY;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const deltaX = e.clientX - lastX;
+        const deltaY = e.clientY - lastY;
+        
+        useViewerStore.getState().setPan(
+          useViewerStore.getState().pan.x + deltaX,
+          useViewerStore.getState().pan.y + deltaY
+        );
+        
+        lastX = e.clientX;
+        lastY = e.clientY;
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDragging = true;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = useViewerStore.getState().zoom * delta;
+    // Clamp zoom between 0.1 and 10
+    const clampedZoom = Math.max(0.1, Math.min(10, newZoom));
+    useViewerStore.getState().setZoom(clampedZoom);
+  }, []);
+
+  // Render when dependencies change
+  useEffect(() => {
+    renderSlice();
+  }, [renderSlice]);
+
+  if (!imageFile) {
+    return (
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          border: '2px dashed #ccc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
+        <p style={{ color: '#666', fontSize: '16px' }}>
+          Load an image file to start viewing
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={containerRef}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        width={canvasSize.width}
+        height={canvasSize.height}
+        style={{
+          border: '1px solid #ccc',
+          cursor: 'grab',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          objectFit: 'contain'
+        }}
+        onMouseDown={handleMouseDown}
+        onWheel={handleWheel}
+      />
+    </div>
+  );
+}; 
