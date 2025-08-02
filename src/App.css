@@ -204,6 +204,8 @@ html, body {
 .file-details {
   flex: 1;
   text-align: left;
+  display: flex;
+  flex-direction: column;
 }
 
 .file-name {
