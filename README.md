@@ -157,7 +157,7 @@ To add support for a new file format:
 - **Debounced Updates**: Smooth UI interactions
 - **Memory Management**: Proper cleanup of large objects
 
-## Deployment
+<!-- ## Deployment
 
 The application is designed to run entirely in the browser, making it perfect for static hosting:
 
@@ -166,7 +166,7 @@ The application is designed to run entirely in the browser, making it perfect fo
 - **Vercel**: Zero-config deployment
 - **Netlify**: Easy static site hosting
 - **GitHub Pages**: Free hosting for open source projects
-- **AWS S3 + CloudFront**: Scalable static hosting
+- **AWS S3 + CloudFront**: Scalable static hosting -->
 
 ### Environment Variables
 
