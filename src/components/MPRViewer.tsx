@@ -155,7 +155,7 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     // Per-plane flipping logic (corrected)
-    let flipX = 1, flipY = 1, transX = 0, transY = 0;
+    let flipX = 1, flipY = 1;
     if (orientation === 'axial') {
       flipX = flipHorizontalAxial ? -1 : 1;
       flipY = flipVerticalAxial ? -1 : 1;

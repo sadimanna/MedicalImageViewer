@@ -119,25 +119,25 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, [imageFile, propWidth, propHeight]);
 
-  const applyWindowLevel = useCallback((pixelValue: number, _min: number, _max: number, windowLevel: { center: number; width: number }): number => {
-    const { center, width: wl } = windowLevel;
-    const windowMin = center - wl / 2;
-    const windowMax = center + wl / 2;
+  // const applyWindowLevel = useCallback((pixelValue: number, _min: number, _max: number, windowLevel: { center: number; width: number }): number => {
+  //   const { center, width: wl } = windowLevel;
+  //   const windowMin = center - wl / 2;
+  //   const windowMax = center + wl / 2;
     
-    // Clamp the pixel value to the window range
-    if (pixelValue <= windowMin) return 0;
-    if (pixelValue >= windowMax) return 255;
+  //   // Clamp the pixel value to the window range
+  //   if (pixelValue <= windowMin) return 0;
+  //   if (pixelValue >= windowMax) return 255;
     
-    // Linear mapping from window range to 0-255
-    return Math.round(((pixelValue - windowMin) / (windowMax - windowMin)) * 255);
-  }, []);
+  //   // Linear mapping from window range to 0-255
+  //   return Math.round(((pixelValue - windowMin) / (windowMax - windowMin)) * 255);
+  // }, []);
 
   // Update extractSlice type signature to accept any TypedArray
   const extractSlice = useCallback((
     data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
     dimensions: [number, number, number],
     sliceIndex: number,
-    windowLevel: { center: number; width: number }
+    _windowLevel: { center: number; width: number }
   ): { sliceData: any; min: number; max: number } => {
     const [width, height] = dimensions;
     const sliceSize = width * height;
