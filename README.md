@@ -208,9 +208,9 @@ No environment variables are required for basic functionality. The application r
 ## Roadmap
 
 ### Phase 2: Advanced Features
-- [ ] Multi-planar reconstruction (MPR)
+- [x] Multi-planar reconstruction (MPR)
 - [ ] 3D volume rendering
-- [ ] DICOM series support
+- [x] DICOM series support
 - [ ] Measurement tools
 - [ ] Annotation capabilities
 

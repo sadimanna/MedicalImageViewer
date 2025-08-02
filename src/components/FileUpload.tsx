@@ -98,8 +98,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
               {type === 'image' ? <FileImage size={24} /> : <FileCode size={24} />}
             </div>
             <div className="file-details">
-              <div className="file-name">{currentFile.filename}</div>
-              <div className="file-dimensions">
+              <div className="file-name" style={{ marginBottom: '4px' }}>{currentFile.filename}</div>
+              <div className="file-dimensions" style={{ marginBottom: '4px' }}>
                 {currentFile.data.dimensions.join(' × ')}
               </div>
               <div className="file-type">{currentFile.fileType.toUpperCase()}</div>
