@@ -30,7 +30,7 @@ interface ViewerState {
 
 interface ViewerActions {
   // File management
-  setImageFile: (file: File | null) => Promise<void>;
+  setImageFile: (file: File | LoadedFile | null) => Promise<void>;
   setMaskFile: (file: LoadedFile | null) => void;
   
   // Slice navigation
@@ -80,7 +80,12 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
     }
     set({ isLoading: true, error: null });
     try {
-      const loadedFile = await fileLoader.loadFile(file);
+      let loadedFile: LoadedFile;
+      if ('data' in file && 'fileType' in file) {
+        loadedFile = file as LoadedFile;
+      } else {
+        loadedFile = await fileLoader.loadFile(file as File);
+      }
       set({
         imageFile: loadedFile,
         totalSlices: loadedFile.data.dimensions[2] || 1,
@@ -90,7 +95,7 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
         zoom: 1,
       });
       // Automatically switch to MPR for volumetric data
-      if (loadedFile.fileType === 'nifti' && loadedFile.data.dimensions[2] > 1) {
+      if ((loadedFile.fileType === 'nifti' || loadedFile.data.dimensions[2] > 1) && loadedFile.data.dimensions.length === 3) {
         set({ viewMode: 'MPR' });
       } else {
         set({ viewMode: '2D' });

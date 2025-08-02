@@ -11,16 +11,34 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const { setImageFile, setMaskFile, setLoading, setError } = useViewerStore();
 
-  const handleFileLoad = async (file: File) => {
+  const handleFileLoad = async (fileOrFiles: File | FileList | File[]) => {
     try {
       setLoading(true);
       setError(null);
-      
-      if (type === 'image') {
-        await setImageFile(file);
-      } else {
-        const loadedFile = await fileLoader.loadFile(file);
-        setMaskFile(loadedFile);
+      let files: File[] = [];
+      if (fileOrFiles instanceof FileList) {
+        files = Array.from(fileOrFiles);
+      } else if (Array.isArray(fileOrFiles)) {
+        files = fileOrFiles;
+      } else if (fileOrFiles instanceof File) {
+        files = [fileOrFiles];
+      }
+      if (files.length === 1) {
+        console.debug('Single file upload:', files[0]);
+        const loadedFile = await fileLoader.loadFile(files[0]);
+        if (type === 'image') {
+          await setImageFile(loadedFile);
+        } else {
+          setMaskFile(loadedFile);
+        }
+      } else if (files.length > 1) {
+        console.debug('Multi-file/folder upload:', files.map(f => f.name));
+        const loadedFile = await fileLoader.loadImageStack(files);
+        if (type === 'image') {
+          await setImageFile(loadedFile);
+        } else {
+          setMaskFile(loadedFile);
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load file');
@@ -32,10 +50,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      handleFileLoad(files[0]);
+      handleFileLoad(files);
     }
   }, [handleFileLoad]);
 
@@ -52,7 +69,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileLoad(files[0]);
+      handleFileLoad(files);
     }
   }, [handleFileLoad]);
 
@@ -99,21 +116,38 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
           <div className="upload-prompt">
             <Upload size={32} />
             <h3>{type === 'image' ? 'Load Image' : 'Load Mask'}</h3>
-            <p>Drag and drop a file here, or click to browse</p>
+            <p>Drag and drop a file, multiple files, or a folder here, or use the buttons below</p>
             <div className="supported-formats">
               <small>
                 Supported formats: .nii, .nii.gz, .npy, .dcm, .dicom, .png, .jpg
               </small>
             </div>
+            {/* Browse Files Button */}
             <input
               type="file"
               accept=".nii,.nii.gz,.npy,.dcm,.dicom,.png,.jpg,.jpeg"
               onChange={handleFileInput}
               style={{ display: 'none' }}
-              id={`file-input-${type}`}
+              id={`file-input-files-${type}`}
+              multiple
             />
-            <label htmlFor={`file-input-${type}`} className="browse-button">
+            <label htmlFor={`file-input-files-${type}`} className="browse-button" style={{ marginRight: 8 }}>
               Browse Files
+            </label>
+            {/* Browse Folder Button */}
+            <input
+              type="file"
+              accept=".nii,.nii.gz,.npy,.dcm,.dicom,.png,.jpg,.jpeg"
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+              id={`file-input-folder-${type}`}
+              multiple
+              // @ts-ignore: webkitdirectory is non-standard but supported in Chrome/Edge
+              webkitdirectory="true"
+              directory="true"
+            />
+            <label htmlFor={`file-input-folder-${type}`} className="browse-button">
+              Browse Folder
             </label>
           </div>
         )}
