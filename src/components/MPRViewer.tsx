@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewerStore } from '../store/viewerStore';
+import { getLabelColor } from './Renderer2D';
 
 interface MPRViewerProps {}
 
@@ -142,13 +143,24 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
         const maskCtx = maskOffscreenCanvas.getContext('2d');
         if (maskCtx) {
             const maskImageData = maskCtx.createImageData(sliceWidth, sliceHeight);
-            for (let i = 0; i < maskSliceData.length; i++) {
-                if (maskSliceData[i] > 0) {
-                    maskImageData.data[i * 4] = 255;
-                    maskImageData.data[i * 4 + 1] = 0;
-                    maskImageData.data[i * 4 + 2] = 0;
-                    maskImageData.data[i * 4 + 3] = 102;
-                }
+            let maskSliceDataUint8: Uint8Array;
+            if (maskSliceData instanceof Uint8Array) {
+              maskSliceDataUint8 = maskSliceData;
+            } else {
+              maskSliceDataUint8 = new Uint8Array(maskSliceData.length);
+              for (let i = 0; i < maskSliceData.length; i++) {
+                maskSliceDataUint8[i] = maskSliceData[i];
+              }
+            }
+            for (let i = 0; i < maskSliceDataUint8.length; i++) {
+              const label = maskSliceDataUint8[i];
+              if (label > 0) {
+                const [r, g, b] = getLabelColor(label);
+                maskImageData.data[i * 4] = r;
+                maskImageData.data[i * 4 + 1] = g;
+                maskImageData.data[i * 4 + 2] = b;
+                maskImageData.data[i * 4 + 3] = 102; // 40% opacity
+              }
             }
             maskCtx.putImageData(maskImageData, 0, 0);
             ctx.drawImage(maskOffscreenCanvas, offsetX, offsetY, scaledWidth, scaledHeight);

@@ -6,6 +6,34 @@ interface Renderer2DProps {
   height?: number;
 }
 
+// Ensure getLabelColor is defined at the top level, before any usage
+function getLabelColor(label: number): [number, number, number] {
+  const palette: [number, number, number][] = [
+    [230, 25, 75],    // Red
+    [60, 180, 75],    // Green
+    [255, 225, 25],   // Yellow
+    [0, 130, 200],    // Blue
+    [245, 130, 48],   // Orange
+    [145, 30, 180],   // Purple
+    [70, 240, 240],   // Cyan
+    [240, 50, 230],   // Magenta
+    [210, 245, 60],   // Lime
+    [250, 190, 190],  // Pink
+    [0, 128, 128],    // Teal
+    [230, 190, 255],  // Lavender
+    [170, 110, 40],   // Brown
+    [255, 250, 200],  // Beige
+    [128, 0, 0],      // Maroon
+    [170, 255, 195],  // Mint
+    [128, 128, 0],    // Olive
+    [255, 215, 180],  // Apricot
+    [0, 0, 128],      // Navy
+    [255, 105, 180],  // Hot Pink
+  ];
+  if (label <= 0) return [0, 0, 0];
+  return palette[(label - 1) % palette.length];
+}
+
 export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height: propHeight }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +128,13 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     return Math.round(((pixelValue - windowMin) / (windowMax - windowMin)) * 255);
   }, []);
 
-  const extractSlice = useCallback((data: Uint8Array | Uint16Array | Float32Array, dimensions: [number, number, number], sliceIndex: number, windowLevel: { center: number; width: number }): { sliceData: Uint8Array, min: number, max: number } => {
+  // Update extractSlice type signature to accept any TypedArray
+  const extractSlice = useCallback((
+    data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
+    dimensions: [number, number, number],
+    sliceIndex: number,
+    windowLevel: { center: number; width: number }
+  ): { sliceData: any; min: number; max: number } => {
     const [width, height] = dimensions;
     const sliceSize = width * height;
     const startIndex = sliceIndex * sliceSize;
@@ -162,7 +196,7 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const imageData = imageCtx.createImageData(imageWidth, imageHeight);
 
     const { sliceData } = extractSlice(
-      imageFile.data.pixelData,
+      imageFile.data.pixelData as any,
       imageFile.data.dimensions,
       currentSlice,
       imageWindowLevel
@@ -187,19 +221,32 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
       const maskCtx = maskCanvas.getContext('2d');
       if (maskCtx) {
         const maskResult = extractSlice(
-          maskFile.data.pixelData,
+          maskFile.data.pixelData as any,
           maskFile.data.dimensions,
           currentSlice,
           maskWindowLevel
         );
         const maskImageData = maskCtx.createImageData(imageWidth, imageHeight);
-        for (let i = 0; i < maskResult.sliceData.length; i++) {
+        let maskSliceData: Uint8Array;
+        if (maskResult.sliceData instanceof Uint8Array) {
+          maskSliceData = maskResult.sliceData;
+        } else if (Array.isArray(maskResult.sliceData) || (maskResult.sliceData && typeof maskResult.sliceData.length === 'number')) {
+          maskSliceData = new Uint8Array(maskResult.sliceData.length);
+          for (let i = 0; i < maskResult.sliceData.length; i++) {
+            maskSliceData[i] = maskResult.sliceData[i];
+          }
+        } else {
+          maskSliceData = new Uint8Array(0);
+        }
+        for (let i = 0; i < maskSliceData.length; i++) {
           const pixelIndex = i * 4;
-          if (maskResult.sliceData[i] > 0) {
-            maskImageData.data[pixelIndex] = 255;     // R
-            maskImageData.data[pixelIndex + 1] = 0;   // G
-            maskImageData.data[pixelIndex + 2] = 0;   // B
-            maskImageData.data[pixelIndex + 3] = 102; // A (40% opacity)
+          const label = maskSliceData[i];
+          if (label > 0) {
+            const [r, g, b] = getLabelColor(label);
+            maskImageData.data[pixelIndex] = r;
+            maskImageData.data[pixelIndex + 1] = g;
+            maskImageData.data[pixelIndex + 2] = b;
+            maskImageData.data[pixelIndex + 3] = 102;
           }
         }
         maskCtx.putImageData(maskImageData, 0, 0);
@@ -329,3 +376,5 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     </div>
   );
 }; 
+
+export { getLabelColor }; 
