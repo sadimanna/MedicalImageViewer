@@ -67,6 +67,36 @@ npm run build
 
 The built files will be in the `dist` directory, ready for deployment to any static hosting service.
 
+
+**Note**: This application is designed for research and educational purposes. Always ensure compliance with local regulations regarding medical data handling and privacy.
+
+## Installing as a Web App (PWA)
+
+This application supports installation as a Progressive Web App (PWA) for an app-like experience on desktop and mobile devices.
+
+### How to Install
+
+- **Desktop Browsers (Chrome, Edge, Brave, etc.):**
+  1. Open the deployed app in your browser at `http://localhost:5173`.
+  2. Look for the install icon (usually in the address bar or browser menu).
+  3. Click "Install" or "Add to desktop" to install the app.
+
+- **Mobile Browsers (Safari, Chrome, Edge, etc.):**
+  1. Open the app URL in your mobile browser.
+  2. Tap the browser menu (three dots or share icon).
+  3. Select "Add to Home Screen".
+  4. The app will appear on your home screen and can be launched like a native app.
+
+### Features of the Installed App
+
+- Launches in standalone mode (no browser UI)
+- App icon on desktop or mobile home screen
+- Works offline after first load (basic functionality)
+- Fast startup and app-like experience
+
+> **Note:** Offline use is supported for previously loaded pages and assets. Some features (like loading new files from the network) may require an internet connection.
+
+
 ## Usage
 
 ### Loading Files
@@ -240,5 +270,3 @@ For issues, questions, or contributions, please:
 3. Include file format and browser information for bug reports
 
 ---
-
-**Note**: This application is designed for research and educational purposes. Always ensure compliance with local regulations regarding medical data handling and privacy.

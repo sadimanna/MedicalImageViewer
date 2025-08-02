@@ -1,0 +1,17 @@
+{
+  "name": "Medical Image Viewer",
+  "short_name": "MedViewer",
+  "description": "A medical image viewer for NIfTI, DICOM, and other medical imaging formats",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "/miv_logo2-small.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+} 
