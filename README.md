@@ -39,7 +39,7 @@ A high-performance, client-side web application for viewing medical images and t
 - Node.js 18+ 
 - npm or yarn
 
-### Installation
+### Installation and Local Development
 
 1. Clone the repository:
 ```bash
@@ -57,7 +57,7 @@ npm install
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+4. Open your browser and go to [http://localhost:5173](http://localhost:5173)
 
 ### Building for Production
 
@@ -67,8 +67,7 @@ npm run build
 
 The built files will be in the `dist` directory, ready for deployment to any static hosting service.
 
-
-**Note**: This application is designed for research and educational purposes. Always ensure compliance with local regulations regarding medical data handling and privacy.
+> **Note**: This application is designed for research and educational purposes. Always ensure compliance with local regulations regarding medical data handling and privacy.
 
 ## Installing as a Web App (PWA)
 
@@ -190,18 +189,6 @@ To add support for a new file format:
 ## Running as a Browser App
 
 This application is designed to run entirely in your web browser. You can use it locally during development, or build it for production and deploy it to any static hosting service (such as Vercel, Netlify, GitHub Pages, or your own server).
-
-### Local Development
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-3. Open your browser and go to [http://localhost:5173](http://localhost:5173)
 
 ### Production Build & Static Hosting
 
