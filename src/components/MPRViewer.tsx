@@ -120,9 +120,11 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
       imageData.data[i * 4 + 3] = 255;
     }
     offscreenCtx.putImageData(imageData, 0, 0);
-    const scale = Math.min(canvas.width / sliceWidth, canvas.height / sliceHeight);
-    const scaledWidth = sliceWidth * scale;
-    const scaledHeight = sliceHeight * scale;
+    const scaleBase = Math.min(canvas.width / sliceWidth, canvas.height / sliceHeight);
+    const scaledWidth = sliceWidth * scaleBase;
+    const scaledHeight = (orientation === 'sagittal' || orientation === 'coronal')
+      ? sliceHeight * scaleBase * 4.5
+      : sliceHeight * scaleBase;
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2;
     ctx.imageSmoothingEnabled = false;
