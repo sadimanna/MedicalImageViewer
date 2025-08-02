@@ -40,9 +40,9 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
   }, []);
 
   const extractSlice = useCallback((
-    data: Float32Array | Uint8Array | Uint16Array, 
-    dims: [number, number, number], 
-    sliceIndex: number, 
+    data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
+    dims: [number, number, number],
+    sliceIndex: number,
     orientation: 'axial' | 'sagittal' | 'coronal'
   ) => {
     const [width, height, depth] = dims;
