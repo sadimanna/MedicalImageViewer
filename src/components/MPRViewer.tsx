@@ -106,6 +106,8 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
       min = Math.min(min, v);
       max = Math.max(max, v);
     }
+    console.log(`[${orientation}] Raw slice data - min: ${min}, max: ${max}`);
+    console.log(`[${orientation}] Window/Level - center: ${imageWindowLevel.center}, width: ${imageWindowLevel.width}`);
     const offscreenCanvas = document.createElement('canvas');
     offscreenCanvas.width = sliceWidth;
     offscreenCanvas.height = sliceHeight;
@@ -113,10 +115,11 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
     if (!offscreenCtx) return;
     const imageData = offscreenCtx.createImageData(sliceWidth, sliceHeight);
     for (let i = 0; i < sliceData.length; i++) {
-      const value = applyWindowLevel(sliceData[i], min, max, imageWindowLevel);
-      imageData.data[i * 4] = value;
-      imageData.data[i * 4 + 1] = value;
-      imageData.data[i * 4 + 2] = value;
+      // Normalize to 0-255
+      const norm = (max > min) ? Math.round(((sliceData[i] - min) / (max - min)) * 255) : 0;
+      imageData.data[i * 4] = norm;
+      imageData.data[i * 4 + 1] = norm;
+      imageData.data[i * 4 + 2] = norm;
       imageData.data[i * 4 + 3] = 255;
     }
     offscreenCtx.putImageData(imageData, 0, 0);
@@ -156,6 +159,7 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
   useEffect(() => {
     if (!imageFile) return;
     const [width, height, depth] = imageFile.data.dimensions;
+    console.debug('Image dimensions:', { width, height, depth });
     if (axialCanvasRef.current) renderView(axialCanvasRef.current, 'axial', axialSlice);
     if (sagittalCanvasRef.current) renderView(sagittalCanvasRef.current, 'sagittal', sagittalSlice);
     if (coronalCanvasRef.current) renderView(coronalCanvasRef.current, 'coronal', coronalSlice);

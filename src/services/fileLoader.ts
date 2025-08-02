@@ -1,7 +1,8 @@
 import * as nifti from 'nifti-reader-js';
+import * as dicomParser from 'dicom-parser';
 
 export interface ImageData {
-  pixelData: Float32Array | Uint8Array | Uint16Array;
+  pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
   dimensions: [number, number, number];
   spacing?: [number, number, number];
   metadata?: Record<string, any>;
@@ -25,110 +26,9 @@ class FileLoaderService {
     const workerCode = `
       self.onmessage = function(e) {
         const { file, type } = e.data;
-        
-        if (type === 'numpy') {
-          // Handle NumPy file parsing
-          const reader = new FileReader();
-          reader.onload = function(event) {
-            const arrayBuffer = event.target.result;
-            // Parse NumPy file format
-            const view = new DataView(arrayBuffer);
-            const magic = new Uint8Array(arrayBuffer, 0, 6);
-            const magicStr = String.fromCharCode(...magic);
-            
-            if (magicStr !== '\\x93NUMPY') {
-              self.postMessage({ error: 'Invalid NumPy file format' });
-              return;
-            }
-            
-            // Parse header
-            const headerLength = view.getUint16(8, true);
-            const header = new TextDecoder().decode(
-              new Uint8Array(arrayBuffer, 10, headerLength)
-            );
-            
-            // Extract shape and data type from header
-            const shapeMatch = header.match(/shape\\(([^)]+)\\)/);
-            const dtypeMatch = header.match(/descr: '([^']+)'/);
-            
-            if (!shapeMatch || !dtypeMatch) {
-              self.postMessage({ error: 'Could not parse NumPy header' });
-              return;
-            }
-            
-            const shape = shapeMatch[1].split(',').map(s => parseInt(s.trim()));
-            const dtype = dtypeMatch[1];
-            
-            // Extract data
-            const dataOffset = 10 + headerLength;
-            const padding = (16 - ((10 + headerLength) % 16)) % 16;
-            const actualDataOffset = dataOffset + padding;
-            
-            // Handle different data types
-            let data;
-            if (dtype === '<u2') { // 16-bit unsigned little-endian
-              data = new Uint16Array(arrayBuffer, actualDataOffset);
-            } else if (dtype === '<u1') { // 8-bit unsigned
-              data = new Uint8Array(arrayBuffer, actualDataOffset);
-            } else {
-              data = new Uint8Array(arrayBuffer, actualDataOffset);
-            }
-            
-            self.postMessage({
-              success: true,
-              data: {
-                pixelData: data,
-                dimensions: shape,
-                dtype: dtype
-              }
-            });
-          };
-          reader.readAsArrayBuffer(file);
-        } else if (type === 'dicom') {
-          // Handle DICOM file parsing
-          const reader = new FileReader();
-          reader.onload = function(event) {
-            const arrayBuffer = event.target.result;
-            const view = new DataView(arrayBuffer);
-            
-            // Check DICOM magic number
-            const magic = new Uint8Array(arrayBuffer, 128, 4);
-            const magicStr = String.fromCharCode(...magic);
-            
-            if (magicStr !== 'DICM') {
-              self.postMessage({ error: 'Invalid DICOM file format' });
-              return;
-            }
-            
-            // Parse DICOM tags (simplified)
-            const rows = view.getUint16(0x28, true);
-            const columns = view.getUint16(0x26, true);
-            const bitsAllocated = view.getUint16(0x150, true);
-            const samplesPerPixel = view.getUint16(0x152, true);
-            
-            // Extract pixel data (simplified - assumes 16-bit data)
-            const pixelDataOffset = 0x200; // Simplified offset
-            const pixelData = new Uint16Array(arrayBuffer, pixelDataOffset);
-            
-            self.postMessage({
-              success: true,
-              data: {
-                pixelData: pixelData,
-                dimensions: [columns, rows, 1],
-                metadata: {
-                  rows,
-                  columns,
-                  bitsAllocated,
-                  samplesPerPixel
-                }
-              }
-            });
-          };
-          reader.readAsArrayBuffer(file);
-        }
+        // NumPy and DICOM handling removed from worker
       };
     `;
-
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     this.worker = new Worker(URL.createObjectURL(blob));
   }
@@ -155,47 +55,147 @@ class FileLoaderService {
 
   private async loadNumPyFile(file: File): Promise<LoadedFile> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        reject(new Error('Worker not initialized'));
-        return;
-      }
-
-      this.worker.onmessage = (e) => {
-        if (e.data.error) {
-          reject(new Error(e.data.error));
-        } else {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const arrayBuffer = event.target!.result as ArrayBuffer;
+          const view = new DataView(arrayBuffer);
+          const magic = new Uint8Array(arrayBuffer, 0, 6);
+          const magicStr = String.fromCharCode(...magic);
+          if (magicStr !== '\x93NUMPY') {
+            reject(new Error('Invalid NumPy file format'));
+            return;
+          }
+          // Version
+          const major = view.getUint8(6);
+          let headerLength, headerStart;
+          if (major === 1) {
+            headerLength = view.getUint16(8, true);
+            headerStart = 10;
+          } else if (major === 2) {
+            headerLength = view.getUint32(8, true);
+            headerStart = 12;
+          } else {
+            reject(new Error('Unsupported NumPy version'));
+            return;
+          }
+          const header = new TextDecoder().decode(
+            new Uint8Array(arrayBuffer, headerStart, headerLength)
+          );
+          // Robust header parsing
+          let headerObj;
+          try {
+            let safeHeader = header
+              .replace(/True/g, 'true')
+              .replace(/False/g, 'false')
+              .replace(/'/g, '"')
+              .split('(').join('[')
+              .split(')').join(']')
+              .replace(/,\s*}/g, '}');
+            headerObj = JSON.parse(safeHeader);
+          } catch (e) {
+            try {
+              headerObj = Function('return ' + header
+                .replace(/True/g, 'true')
+                .replace(/False/g, 'false')
+                .replace(/None/g, 'null')
+                .replace(/'/g, '"')
+                .split('(').join('[')
+                .split(')').join(']')
+                .replace(/,\s*}/g, '}')
+              )();
+            } catch (e2) {
+              reject(new Error('Could not robustly parse NumPy header'));
+              return;
+            }
+          }
+          if (!headerObj || !headerObj.shape || !headerObj.descr) {
+            reject(new Error('Could not parse NumPy header'));
+            return;
+          }
+          const shape = Array.isArray(headerObj.shape) ? headerObj.shape : Array.from(headerObj.shape);
+          const dtype = headerObj.descr;
+          // Calculate data offset (align to 16 bytes)
+          const dataOffset = headerStart + headerLength;
+          const padding = (16 - (dataOffset % 16)) % 16;
+          const actualDataOffset = dataOffset + padding;
+          // Handle different data types
+          let data;
+          if (dtype === '<u2') {
+            data = new Uint16Array(arrayBuffer, actualDataOffset);
+          } else if (dtype === '<u1') {
+            data = new Uint8Array(arrayBuffer, actualDataOffset);
+          } else if (dtype === '<f4') {
+            data = new Float32Array(arrayBuffer, actualDataOffset);
+          } else if (dtype === '<i4') {
+            data = new Int32Array(arrayBuffer, actualDataOffset);
+          } else if (dtype === '<i2') {
+            data = new Int16Array(arrayBuffer, actualDataOffset);
+          } else if (dtype === '<f8') {
+            data = new Float64Array(arrayBuffer, actualDataOffset);
+          } else {
+            data = new Uint8Array(arrayBuffer, actualDataOffset);
+          }
           resolve({
-            data: e.data.data,
+            data: {
+              pixelData: data,
+              dimensions: shape.length === 2 ? [shape[0], shape[1], 1] : shape
+            },
             filename: file.name,
             fileType: 'numpy'
           });
+        } catch (err) {
+          reject(new Error('Failed to parse NumPy: ' + (err as Error).message));
         }
       };
-
-      this.worker.postMessage({ file, type: 'numpy' });
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
     });
   }
 
   private async loadDicomFile(file: File): Promise<LoadedFile> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        reject(new Error('Worker not initialized'));
-        return;
-      }
-
-      this.worker.onmessage = (e) => {
-        if (e.data.error) {
-          reject(new Error(e.data.error));
-        } else {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const arrayBuffer = event.target!.result as ArrayBuffer;
+          const byteArray = new Uint8Array(arrayBuffer);
+          const dataSet = dicomParser.parseDicom(byteArray);
+          const rows = dataSet.uint16('x00280010');
+          const columns = dataSet.uint16('x00280011');
+          const samplesPerPixel = dataSet.uint16('x00280002') || 1;
+          const bitsAllocated = dataSet.uint16('x00280100');
+          const pixelDataElement = dataSet.elements.x7fe00010;
+          if (!rows || !columns || !pixelDataElement) {
+            reject(new Error('Missing DICOM image data or dimensions'));
+            return;
+          }
+          let pixelData;
+          if (bitsAllocated === 16) {
+            pixelData = new Uint16Array(arrayBuffer, pixelDataElement.dataOffset, rows * columns * samplesPerPixel);
+          } else {
+            pixelData = new Uint8Array(arrayBuffer, pixelDataElement.dataOffset, rows * columns * samplesPerPixel);
+          }
           resolve({
-            data: e.data.data,
+            data: {
+              pixelData: pixelData,
+              dimensions: [rows, columns, 1],
+              metadata: {
+                rows,
+                columns,
+                samplesPerPixel,
+                bitsAllocated
+              }
+            },
             filename: file.name,
             fileType: 'dicom'
           });
+        } catch (err) {
+          reject(new Error('Failed to parse DICOM: ' + (err as Error).message));
         }
       };
-
-      this.worker.postMessage({ file, type: 'dicom' });
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
     });
   }
 

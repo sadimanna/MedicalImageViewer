@@ -104,11 +104,9 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const [width, height] = dimensions;
     const sliceSize = width * height;
     const startIndex = sliceIndex * sliceSize;
-    
     const sliceData = new Uint8Array(sliceSize);
     let min = Infinity;
     let max = -Infinity;
-    
     // First pass: find min/max values
     for (let i = 0; i < sliceSize; i++) {
       const sourceIndex = startIndex + i;
@@ -118,30 +116,37 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
         max = Math.max(max, value);
       }
     }
-    
-    // Second pass: apply window/level
+    // Second pass: normalize to 0-255
     for (let i = 0; i < sliceSize; i++) {
       const sourceIndex = startIndex + i;
       if (sourceIndex < data.length) {
-        const pixelValue = data[sourceIndex];
-        sliceData[i] = applyWindowLevel(pixelValue, min, max, windowLevel);
+        const value = data[sourceIndex];
+        const norm = (max > min) ? Math.round(((value - min) / (max - min)) * 255) : 0;
+        sliceData[i] = norm;
       }
     }
-    
     return { sliceData, min, max };
-  }, [applyWindowLevel]);
+  }, []);
 
   const renderSlice = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !imageFile) return;
+    if (!canvas || !imageFile) {
+      console.debug('renderSlice: No canvas or imageFile', { canvas, imageFile });
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.debug('renderSlice: No 2d context');
+      return;
+    }
 
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
     const imageWidth = imageFile.data.dimensions[0];
     const imageHeight = imageFile.data.dimensions[1];
+    console.debug('renderSlice: imageWidth, imageHeight', imageWidth, imageHeight);
+    console.debug('renderSlice: pixelData length', imageFile.data.pixelData?.length);
 
     // Create an off-screen canvas for the image slice
     const imageCanvas = document.createElement('canvas');
@@ -150,6 +155,12 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const imageCtx = imageCanvas.getContext('2d');
     if (!imageCtx) return;
 
+    if (!Number.isFinite(imageWidth) || !Number.isFinite(imageHeight) || imageWidth <= 0 || imageHeight <= 0) {
+      console.error('Invalid image dimensions for createImageData:', { imageWidth, imageHeight, dimensions: imageFile.data.dimensions });
+      return;
+    }
+    const imageData = imageCtx.createImageData(imageWidth, imageHeight);
+
     const { sliceData } = extractSlice(
       imageFile.data.pixelData,
       imageFile.data.dimensions,
@@ -157,7 +168,6 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
       imageWindowLevel
     );
 
-    const imageData = imageCtx.createImageData(imageWidth, imageHeight);
     for (let i = 0; i < sliceData.length; i++) {
       const pixelIndex = i * 4;
       const value = sliceData[i];
@@ -257,17 +267,16 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = useViewerStore.getState().zoom * delta;
-    // Clamp zoom between 0.1 and 10
-    const clampedZoom = Math.max(0.1, Math.min(10, newZoom));
-    useViewerStore.getState().setZoom(clampedZoom);
-  }, []);
-
   // Render when dependencies change
   useEffect(() => {
+    console.debug('Renderer2D: imageFile', imageFile);
+    console.debug('Renderer2D: maskFile', maskFile);
+    console.debug('Renderer2D: currentSlice', currentSlice);
+    console.debug('Renderer2D: imageWindowLevel', imageWindowLevel);
+    console.debug('Renderer2D: maskWindowLevel', maskWindowLevel);
+    console.debug('Renderer2D: zoom', zoom);
+    console.debug('Renderer2D: pan', pan);
+    console.debug('Renderer2D: canvasSize', canvasSize);
     renderSlice();
   }, [renderSlice]);
 
@@ -316,7 +325,6 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
           objectFit: 'contain'
         }}
         onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
       />
     </div>
   );
