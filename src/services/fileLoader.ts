@@ -1,5 +1,6 @@
 import * as nifti from 'nifti-reader-js';
 import * as dicomParser from 'dicom-parser';
+import * as pako from 'pako';
 
 export interface ImageData {
   pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
@@ -203,7 +204,17 @@ class FileLoaderService {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const arrayBuffer = reader.result as ArrayBuffer;
+        let arrayBuffer = reader.result as ArrayBuffer;
+        // Decompress if .nii.gz
+        if (file.name.toLowerCase().endsWith('.nii.gz')) {
+          try {
+            const compressed = new Uint8Array(arrayBuffer);
+            arrayBuffer = pako.inflate(compressed).buffer;
+          } catch (err) {
+            reject(new Error('Failed to decompress .nii.gz file: ' + err));
+            return;
+          }
+        }
         if (nifti.isNIFTI(arrayBuffer)) {
           const niftiHeader = nifti.readHeader(arrayBuffer);
           let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
@@ -232,11 +243,11 @@ class FileLoaderService {
           }
 
           const dims = [
-            niftiHeader.dims[1], 
-            niftiHeader.dims[2], 
+            niftiHeader.dims[1],
+            niftiHeader.dims[2],
             niftiHeader.dims[3]
           ];
-          
+
           resolve({
             data: {
               pixelData: pixelData,
