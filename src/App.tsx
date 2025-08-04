@@ -1,11 +1,10 @@
-
-
 import { FileUpload } from './components/FileUpload';
 import { Renderer2D } from './components/Renderer2D';
 import { MPRViewer } from './components/MPRViewer';
 import { ViewerControls } from './components/ViewerControls';
 import { useViewerStore } from './store/viewerStore';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
 function App() {
@@ -67,6 +66,7 @@ function App() {
           Supports: NIfTI (.nii, .nii.gz), DICOM (.dcm, .dicom), NumPy (.npy), and standard image formats (.png, .jpg)
         </p>
       </footer>
+      <Analytics />
     </div>
   );
 }
