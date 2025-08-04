@@ -13,13 +13,32 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Network-first for HTML files (root and index.html)
+  if (
+    event.request.mode === 'navigate' ||
+    event.request.url.endsWith('/index.html')
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Optionally update the cache
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for everything else
   event.respondWith(
     caches.match(event.request)
-      .then((response) => {
-        return response || fetch(event.request);
-      })
+      .then((response) => response || fetch(event.request))
   );
-}); 
+});
+
 
 self.addEventListener('activate', event => {
   event.waitUntil(
