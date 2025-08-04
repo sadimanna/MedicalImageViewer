@@ -218,25 +218,43 @@ class FileLoaderService {
         if (nifti.isNIFTI(arrayBuffer)) {
           const niftiHeader = nifti.readHeader(arrayBuffer);
           let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
-          let pixelData: Float32Array | Uint8Array | Uint16Array;
+          let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
 
           if (niftiImage instanceof ArrayBuffer) {
             // Convert ArrayBuffer to correct typed array based on datatypeCode
             switch (niftiHeader.datatypeCode) {
-              case nifti.NIFTI1.TYPE_UINT8:
+              case nifti.NIFTI1.TYPE_UINT8: // 2
                 pixelData = new Uint8Array(niftiImage);
                 break;
-              case nifti.NIFTI1.TYPE_UINT16:
+              case nifti.NIFTI1.TYPE_INT16: // 4
+                pixelData = new Int16Array(niftiImage);
+                break;
+              case nifti.NIFTI1.TYPE_INT32: // 8
+                pixelData = new Int32Array(niftiImage);
+                break;
+              case nifti.NIFTI1.TYPE_FLOAT32: // 16
+                pixelData = new Float32Array(niftiImage);
+                break;
+              case nifti.NIFTI1.TYPE_COMPLEX64: // 32
+                throw new Error('NIfTI complex64 data type is not supported.');
+              case nifti.NIFTI1.TYPE_FLOAT64: // 64
+                pixelData = new Float64Array(niftiImage);
+                break;
+              case nifti.NIFTI1.TYPE_UINT16: // 512
                 pixelData = new Uint16Array(niftiImage);
                 break;
-              case nifti.NIFTI1.TYPE_INT16:
-                pixelData = new Int16Array(niftiImage) as any;
-                break;
-              case nifti.NIFTI1.TYPE_FLOAT32:
-                pixelData = new Float32Array(niftiImage);
-                break;
+              case nifti.NIFTI1.TYPE_INT64: // 1024
+                throw new Error('NIfTI int64 data type is not supported in JavaScript.');
+              case nifti.NIFTI1.TYPE_UINT64: // 2048
+                throw new Error('NIfTI uint64 data type is not supported in JavaScript.');
+              case nifti.NIFTI1.TYPE_FLOAT128: // 128
+                throw new Error('NIfTI float128 data type is not supported in JavaScript.');
+              case nifti.NIFTI1.TYPE_COMPLEX128: // 1536
+                throw new Error('NIfTI complex128 data type is not supported.');
+              case nifti.NIFTI1.TYPE_COMPLEX256: // 1792
+                throw new Error('NIfTI complex256 data type is not supported.');
               default:
-                pixelData = new Float32Array(niftiImage);
+                throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
             }
           } else {
             pixelData = niftiImage as any;
@@ -261,7 +279,7 @@ class FileLoaderService {
 
           resolve({
             data: {
-              pixelData: pixelData,
+              pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
               dimensions: dims as [number, number, number],
               metadata: {
                 ...niftiHeader
@@ -335,7 +353,7 @@ class FileLoaderService {
   async loadImageStack(files: File[]): Promise<LoadedFile> {
     // Sort files by name (for DICOM, could use metadata if needed)
     const sortedFiles = files.slice().sort((a, b) => a.name.localeCompare(b.name));
-    const slices: { data: Float32Array | Uint8Array | Uint16Array; width: number; height: number; fileType: string; }[] = [];
+    const slices: { data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array; width: number; height: number; fileType: string; }[] = [];
     for (const file of sortedFiles) {
       const ext = file.name.toLowerCase().split('.').pop();
       let loaded;
@@ -350,7 +368,7 @@ class FileLoaderService {
       }
       const dims = loaded.data.dimensions;
       slices.push({
-        data: loaded.data.pixelData as Float32Array | Uint8Array | Uint16Array,
+        data: loaded.data.pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
         width: dims[0],
         height: dims[1],
         fileType: loaded.fileType
