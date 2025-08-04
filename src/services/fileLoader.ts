@@ -242,6 +242,17 @@ class FileLoaderService {
             pixelData = niftiImage as any;
           }
 
+          // Log NIfTI header
+          console.log('NIfTI Header:', niftiHeader);
+          // Log pixel data stats
+          let min = Infinity, max = -Infinity;
+          for (let i = 0; i < pixelData.length; i++) {
+            const v = pixelData[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+          console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', Array.from(pixelData).slice(0, 20));
+
           const dims = [
             niftiHeader.dims[1],
             niftiHeader.dims[2],
