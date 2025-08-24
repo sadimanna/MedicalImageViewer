@@ -272,11 +272,11 @@ class FileLoaderService {
           console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', Array.from(pixelData).slice(0, 20));
 
           const dims = [
-            niftiHeader.dims[1],
-            niftiHeader.dims[2],
+            niftiHeader.dims[1], 
+            niftiHeader.dims[2], 
             niftiHeader.dims[3]
           ];
-
+          
           resolve({
             data: {
               pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,

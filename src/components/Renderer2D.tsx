@@ -1,37 +1,10 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewerStore } from '../store/viewerStore';
+import { getLabelColor } from '../utils/colorUtils';
 
 interface Renderer2DProps {
   width?: number;
   height?: number;
-}
-
-// Ensure getLabelColor is defined at the top level, before any usage
-function getLabelColor(label: number): [number, number, number] {
-  const palette: [number, number, number][] = [
-    [230, 25, 75],    // Red
-    [60, 180, 75],    // Green
-    [255, 225, 25],   // Yellow
-    [0, 130, 200],    // Blue
-    [245, 130, 48],   // Orange
-    [145, 30, 180],   // Purple
-    [70, 240, 240],   // Cyan
-    [240, 50, 230],   // Magenta
-    [210, 245, 60],   // Lime
-    [250, 190, 190],  // Pink
-    [0, 128, 128],    // Teal
-    [230, 190, 255],  // Lavender
-    [170, 110, 40],   // Brown
-    [255, 250, 200],  // Beige
-    [128, 0, 0],      // Maroon
-    [170, 255, 195],  // Mint
-    [128, 128, 0],    // Olive
-    [255, 215, 180],  // Apricot
-    [0, 0, 128],      // Navy
-    [255, 105, 180],  // Hot Pink
-  ];
-  if (label <= 0) return [0, 0, 0];
-  return palette[(label - 1) % palette.length];
 }
 
 export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height: propHeight }) => {
@@ -136,9 +109,8 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
   const extractSlice = useCallback((
     data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
     dimensions: [number, number, number],
-    sliceIndex: number,
-    _windowLevel: { center: number; width: number }
-  ): { sliceData: any; min: number; max: number } => {
+    sliceIndex: number
+  ): { sliceData: Uint8Array | number[]; min: number; max: number } => {
     const [width, height] = dimensions;
     const sliceSize = width * height;
     const startIndex = sliceIndex * sliceSize;
@@ -200,10 +172,9 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const imageData = imageCtx.createImageData(imageWidth, imageHeight);
 
     const { sliceData } = extractSlice(
-      imageFile.data.pixelData as any,
+      imageFile.data.pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
       imageFile.data.dimensions,
-      currentSlice,
-      imageWindowLevel
+      currentSlice
     );
 
     for (let i = 0; i < sliceData.length; i++) {
@@ -225,16 +196,15 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
       const maskCtx = maskCanvas.getContext('2d');
       if (maskCtx) {
         const maskResult = extractSlice(
-          maskFile.data.pixelData as any,
+          maskFile.data.pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
           maskFile.data.dimensions,
-          currentSlice,
-          maskWindowLevel
+          currentSlice
         );
         const maskImageData = maskCtx.createImageData(imageWidth, imageHeight);
         let maskSliceData: Uint8Array;
         if (maskResult.sliceData instanceof Uint8Array) {
           maskSliceData = maskResult.sliceData;
-        } else if (Array.isArray(maskResult.sliceData) || (maskResult.sliceData && typeof maskResult.sliceData.length === 'number')) {
+        } else if (Array.isArray(maskResult.sliceData)) {
           maskSliceData = new Uint8Array(maskResult.sliceData.length);
           for (let i = 0; i < maskResult.sliceData.length; i++) {
             maskSliceData[i] = maskResult.sliceData[i];
@@ -271,8 +241,8 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     const offsetY = (canvasSize.height - scaledHeight) / 2 + pan.y;
 
     // Flipping logic (corrected)
-    let flipX = flipHorizontal2D ? -1 : 1;
-    let flipY = flipVertical2D ? -1 : 1;
+    const flipX = flipHorizontal2D ? -1 : 1;
+    const flipY = flipVertical2D ? -1 : 1;
     ctx.translate(offsetX, offsetY);
     if (flipX === -1) ctx.translate(scaledWidth, 0);
     if (flipY === -1) ctx.translate(0, scaledHeight);
@@ -372,5 +342,3 @@ export const Renderer2D: React.FC<Renderer2DProps> = ({ width: propWidth, height
     </div>
   );
 }; 
-
-export { getLabelColor }; 

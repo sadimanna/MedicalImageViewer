@@ -80,7 +80,7 @@ interface ViewerActions {
   setFlipVerticalCoronal: (flip: boolean) => void;
 }
 
-export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
+export const useViewerStore = create<ViewerState & ViewerActions>((set: any) => ({
   // Initial state
   imageFile: null,
   maskFile: null,
@@ -104,7 +104,7 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
   flipVerticalCoronal: false,
   
   // Actions
-  setImageFile: async (file) => {
+  setImageFile: async (file: File | LoadedFile | null) => {
     if (!file) {
       set({ imageFile: null, totalSlices: 0, currentSlice: 0, error: null });
       return;
@@ -136,46 +136,46 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
     }
   },
   
-  setMaskFile: (file) => {
+  setMaskFile: (file: LoadedFile | null) => {
     set({
       maskFile: file,
       error: null
     });
   },
   
-  setCurrentSlice: (slice) => {
+  setCurrentSlice: (slice: number) => {
     set({ currentSlice: slice });
   },
   
-  setTotalSlices: (total) => {
+  setTotalSlices: (total: number) => {
     set({ totalSlices: total });
   },
   
-  setLoading: (loading) => {
+  setLoading: (loading: boolean) => {
     set({ isLoading: loading });
   },
   
-  setError: (error) => {
+  setError: (error: string | null) => {
     set({ error });
   },
   
-  setImageWindowLevel: (windowLevel) => {
+  setImageWindowLevel: (windowLevel: { center: number; width: number }) => {
     set({ imageWindowLevel: windowLevel });
   },
   
-  setMaskWindowLevel: (windowLevel) => {
+  setMaskWindowLevel: (windowLevel: { center: number; width: number }) => {
     set({ maskWindowLevel: windowLevel });
   },
   
-  setZoom: (zoom) => {
+  setZoom: (zoom: number) => {
     set({ zoom });
   },
   
-  setPan: (x, y) => {
+  setPan: (x: number, y: number) => {
     set({ pan: { x, y } });
   },
   
-  setViewMode: (mode) => {
+  setViewMode: (mode: '2D' | 'MPR' | '3D') => {
     set({ viewMode: mode });
   },
   
@@ -189,13 +189,13 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set) => ({
     });
   },
   
-  setFlipHorizontal2D: (flip) => set({ flipHorizontal2D: flip }),
-  setFlipVertical2D: (flip) => set({ flipVertical2D: flip }),
+  setFlipHorizontal2D: (flip: boolean) => set({ flipHorizontal2D: flip }),
+  setFlipVertical2D: (flip: boolean) => set({ flipVertical2D: flip }),
   // Per-plane MPR flip
-  setFlipHorizontalAxial: (flip) => set({ flipHorizontalAxial: flip }),
-  setFlipVerticalAxial: (flip) => set({ flipVerticalAxial: flip }),
-  setFlipHorizontalSagittal: (flip) => set({ flipHorizontalSagittal: flip }),
-  setFlipVerticalSagittal: (flip) => set({ flipVerticalSagittal: flip }),
-  setFlipHorizontalCoronal: (flip) => set({ flipHorizontalCoronal: flip }),
-  setFlipVerticalCoronal: (flip) => set({ flipVerticalCoronal: flip }),
+  setFlipHorizontalAxial: (flip: boolean) => set({ flipHorizontalAxial: flip }),
+  setFlipVerticalAxial: (flip: boolean) => set({ flipVerticalAxial: flip }),
+  setFlipHorizontalSagittal: (flip: boolean) => set({ flipHorizontalSagittal: flip }),
+  setFlipVerticalSagittal: (flip: boolean) => set({ flipVerticalSagittal: flip }),
+  setFlipHorizontalCoronal: (flip: boolean) => set({ flipHorizontalCoronal: flip }),
+  setFlipVerticalCoronal: (flip: boolean) => set({ flipVerticalCoronal: flip }),
 })); 

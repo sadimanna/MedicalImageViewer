@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewerStore } from '../store/viewerStore';
-import { getLabelColor } from './Renderer2D';
+import { getLabelColor } from '../utils/colorUtils';
+import VTKVolumeRenderer3D from './VTKVolumeRenderer3D';
 
-interface MPRViewerProps {}
+// No props needed for MPRViewer component
+type MPRViewerProps = Record<string, never>;
 
 export const MPRViewer: React.FC<MPRViewerProps> = () => {
   const axialCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -269,10 +271,16 @@ export const MPRViewer: React.FC<MPRViewerProps> = () => {
         </div>
         <div className="mpr-view">
           <h4>3D</h4>
-          <div style={{ width: '256px', height: '256px', border: '1px solid #e0e0e0', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
-            <p style={{ color: '#666', fontSize: '12px', textAlign: 'center' }}>
-              3D View<br/>Coming Soon
-            </p>
+          <div style={{ width: '256px', height: '256px', border: '1px solid #e0e0e0', borderRadius: '2px' }}>
+            {imageFile ? (
+                              <VTKVolumeRenderer3D volumeArray={imageFile.data.pixelData} dimensions={imageFile.data.dimensions} showControls={true} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+                <p style={{ color: '#666', fontSize: '12px', textAlign: 'center' }}>
+                  3D View<br/>Coming Soon
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
