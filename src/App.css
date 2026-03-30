@@ -41,7 +41,7 @@ html, body {
   flex-direction: column;
   width: min(1680px, calc(100vw - 20px));
   min-width: 0;
-  margin: 10px auto;
+  margin: 0 auto 10px;
   gap: 8px;
   /* overflow: hidden; */
 }
@@ -314,8 +314,8 @@ html, body {
 /* Viewer section - takes remaining space */
 .viewer-section {
   display: grid;
-  grid-template-columns: 1fr 180px;
-  gap: 0.125rem;
+  grid-template-columns: 1fr 280px;
+  gap: 0.5rem;
   min-height: 0;
   min-width: 0;
   padding: 0.125rem;
@@ -349,6 +349,7 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-width: 260px;
 }
 
 /* Controls styling */
@@ -369,9 +370,9 @@ html, body {
 }
 
 .control-section h4 {
-  margin-bottom: 0.125rem;
+  margin-bottom: 0.3rem;
   color: #333;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
@@ -383,7 +384,7 @@ html, body {
 
 .slice-slider {
   width: 100%;
-  height: 2px;
+  height: 4px;
   border-radius: 1px;
   background: #e0e0e0;
   outline: none;
@@ -394,16 +395,16 @@ html, body {
 .slice-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #667eea;
   cursor: pointer;
 }
 
 .slice-slider::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #667eea;
   cursor: pointer;
@@ -413,7 +414,7 @@ html, body {
 .slice-info {
   text-align: center;
   color: #666;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
 }
 
 .window-level-controls {
@@ -429,14 +430,14 @@ html, body {
 }
 
 .control-group label {
-  min-width: 35px;
-  font-size: 0.7rem;
+  min-width: 48px;
+  font-size: 0.82rem;
   color: #666;
 }
 
 .control-slider {
   flex: 1;
-  height: 1px;
+  height: 4px;
   border-radius: 1px;
   background: #e0e0e0;
   outline: none;
@@ -447,16 +448,16 @@ html, body {
 .control-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 8px;
-  height: 8px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #667eea;
   cursor: pointer;
 }
 
 .control-slider::-moz-range-thumb {
-  width: 8px;
-  height: 8px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #667eea;
   cursor: pointer;
@@ -464,9 +465,9 @@ html, body {
 }
 
 .control-group span {
-  min-width: 20px;
+  min-width: 34px;
   text-align: right;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: #666;
 }
 

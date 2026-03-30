@@ -2,12 +2,12 @@ import { Analytics } from '@vercel/analytics/react';
 import { Suspense, lazy } from 'react';
 import './App.css';
 import { FileUpload } from './components/FileUpload';
+import { Renderer2D } from './components/Renderer2D';
+import { MPRViewer } from './components/MPRViewer';
+import { ViewerControls } from './components/ViewerControls';
 import { useViewerStore } from './store/viewerStore';
 
-const Renderer2D = lazy(() => import('./components/Renderer2D').then((module) => ({ default: module.Renderer2D })));
-const MPRViewer = lazy(() => import('./components/MPRViewer').then((module) => ({ default: module.MPRViewer })));
 const VTKVolumeRenderer3D = lazy(() => import('./components/VTKVolumeRenderer3D'));
-const ViewerControls = lazy(() => import('./components/ViewerControls').then((module) => ({ default: module.ViewerControls })));
 
 function App() {
   const { imageFile, isLoading, loadingMessage, loadingProgress, error, viewMode } = useViewerStore();
@@ -38,23 +38,15 @@ function App() {
     }
 
     if (viewMode === '2D') {
-      return (
-        <Suspense fallback={<div style={{ color: '#666' }}>Loading 2D viewer…</div>}>
-          <Renderer2D />
-        </Suspense>
-      );
+      return <Renderer2D />;
     }
 
     if (viewMode === 'MPR') {
-      return (
-        <Suspense fallback={<div style={{ color: '#666' }}>Loading MPR viewer…</div>}>
-          <MPRViewer />
-        </Suspense>
-      );
+      return <MPRViewer />;
     }
 
     return (
-      <div style={{ width: '100%', height: '100%', minHeight: '512px' }}>
+      <div style={{ width: '70%', height: '70%', minHeight: '360px', minWidth: '360px' }}>
         <Suspense fallback={<div style={{ color: '#666' }}>Loading 3D viewer…</div>}>
           <VTKVolumeRenderer3D
             volumeArray={imageFile.data.pixelData}
@@ -89,9 +81,7 @@ function App() {
         <div className="viewer-section">
           <div className="viewer-container">{renderViewer()}</div>
           <div className="controls-sidebar">
-            <Suspense fallback={<div style={{ color: '#666' }}>Loading controls…</div>}>
-              <ViewerControls />
-            </Suspense>
+            <ViewerControls />
           </div>
         </div>
 

@@ -20,6 +20,9 @@ export const ViewerControls: React.FC = () => {
     resetView
   } = useViewerStore();
 
+  const isVolume = !!imageFile && imageFile.data.dimensions[2] > 1;
+  const isSingleImage = !!imageFile && imageFile.data.dimensions[2] <= 1;
+
   const handleSliceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const slice = parseInt(e.target.value);
     setCurrentSlice(slice);
@@ -72,20 +75,6 @@ export const ViewerControls: React.FC = () => {
             >
               2D
             </button>
-            <button
-              className={`mode-button ${viewMode === 'MPR' ? 'active' : ''}`}
-              onClick={() => setViewMode('MPR')}
-              title="Multi-Planar Reconstruction"
-            >
-              <Grid3X3 size={14} />
-            </button>
-            <button
-              className={`mode-button ${viewMode === '3D' ? 'active' : ''}`}
-              onClick={() => setViewMode('3D')}
-              title="3D Volume Rendering"
-            >
-              <Box size={14} />
-            </button>
           </div>
         </div>
         <div className="control-section">
@@ -107,27 +96,33 @@ export const ViewerControls: React.FC = () => {
       <div className="control-section">
         <h4>View Mode</h4>
         <div className="view-mode-controls">
-          <button
-            className={`mode-button ${viewMode === '2D' ? 'active' : ''}`}
-            onClick={() => setViewMode('2D')}
-            title="2D View"
-          >
-            2D
-          </button>
-          <button
-            className={`mode-button ${viewMode === 'MPR' ? 'active' : ''}`}
-            onClick={() => setViewMode('MPR')}
-            title="Multi-Planar Reconstruction"
-          >
-            <Grid3X3 size={14} />
-          </button>
-          <button
-            className={`mode-button ${viewMode === '3D' ? 'active' : ''}`}
-            onClick={() => setViewMode('3D')}
-            title="3D Volume Rendering"
-          >
-            <Box size={14} />
-          </button>
+          {isSingleImage && (
+            <button
+              className={`mode-button ${viewMode === '2D' ? 'active' : ''}`}
+              onClick={() => setViewMode('2D')}
+              title="2D View"
+            >
+              2D
+            </button>
+          )}
+          {isVolume && (
+            <>
+              <button
+                className={`mode-button ${viewMode === 'MPR' ? 'active' : ''}`}
+                onClick={() => setViewMode('MPR')}
+                title="Multi-Planar Reconstruction"
+              >
+                <Grid3X3 size={14} />
+              </button>
+              <button
+                className={`mode-button ${viewMode === '3D' ? 'active' : ''}`}
+                onClick={() => setViewMode('3D')}
+                title="3D Volume Rendering"
+              >
+                <Box size={14} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
