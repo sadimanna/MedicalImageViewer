@@ -240,62 +240,53 @@ class FileLoaderService {
           await yieldToUI();
           if (nifti.isNIFTI(arrayBuffer)) {
             const niftiHeader = nifti.readHeader(arrayBuffer);
-            let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
+            const dims: [number, number, number] = [
+              niftiHeader.dims[1],
+              niftiHeader.dims[2],
+              niftiHeader.dims[3],
+            ];
+            const voxelCount = dims[0] * dims[1] * dims[2];
+            const voxelOffset = Math.floor((niftiHeader as any).vox_offset || 0);
             onProgress?.({ phase: 'Decoding voxel data…', percent: 92 });
             await yieldToUI();
             let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
 
-          if (niftiImage instanceof ArrayBuffer) {
-            // Convert ArrayBuffer to correct typed array based on datatypeCode
+            // Direct typed-array view from voxel payload to avoid heavy full-buffer copies.
             switch (niftiHeader.datatypeCode) {
               case nifti.NIFTI1.TYPE_UINT8: // 2
-                pixelData = new Uint8Array(niftiImage);
+                pixelData = new Uint8Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_INT16: // 4
-                pixelData = new Int16Array(niftiImage);
+                pixelData = new Int16Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_INT32: // 8
-                pixelData = new Int32Array(niftiImage);
+                pixelData = new Int32Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_FLOAT32: // 16
-                pixelData = new Float32Array(niftiImage);
+                pixelData = new Float32Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
-              case nifti.NIFTI1.TYPE_COMPLEX64: // 32
-                throw new Error('NIfTI complex64 data type is not supported.');
               case nifti.NIFTI1.TYPE_FLOAT64: // 64
-                pixelData = new Float64Array(niftiImage);
+                pixelData = new Float64Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_UINT16: // 512
-                pixelData = new Uint16Array(niftiImage);
+                pixelData = new Uint16Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_INT8: // 256
-                pixelData = Float32Array.from(new Int8Array(niftiImage));
+                pixelData = Float32Array.from(new Int8Array(arrayBuffer, voxelOffset, voxelCount));
                 break;
               case nifti.NIFTI1.TYPE_UINT32: // 768
-                pixelData = Float32Array.from(new Uint32Array(niftiImage));
+                pixelData = Float32Array.from(new Uint32Array(arrayBuffer, voxelOffset, voxelCount));
                 break;
+              case nifti.NIFTI1.TYPE_COMPLEX64: // 32
               case nifti.NIFTI1.TYPE_INT64: // 1024
-                throw new Error('NIfTI int64 data type is not supported in JavaScript.');
               case nifti.NIFTI1.TYPE_UINT64: // 2048
-                throw new Error('NIfTI uint64 data type is not supported in JavaScript.');
               case nifti.NIFTI1.TYPE_FLOAT128: // 128
-                throw new Error('NIfTI float128 data type is not supported in JavaScript.');
               case nifti.NIFTI1.TYPE_COMPLEX128: // 1536
-                throw new Error('NIfTI complex128 data type is not supported.');
               case nifti.NIFTI1.TYPE_COMPLEX256: // 1792
-                throw new Error('NIfTI complex256 data type is not supported.');
+                throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
               default:
                 throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
             }
-          } else {
-            pixelData = niftiImage as any;
-          }
-
-            const dims = [
-              niftiHeader.dims[1], 
-              niftiHeader.dims[2], 
-              niftiHeader.dims[3]
-            ];
 
             onProgress?.({ phase: 'Finalizing volume…', percent: 98 });
             await yieldToUI();
