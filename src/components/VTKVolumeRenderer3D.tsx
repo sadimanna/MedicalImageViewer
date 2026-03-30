@@ -27,7 +27,7 @@ function VTKVolumeRenderer3D({
   showControls = false,
   backgroundColor = [0.1, 0.1, 0.1]
 }: VTKVolumeRenderer3DProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
   const contextRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,11 @@ function VTKVolumeRenderer3D({
   } | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || !volumeArray || dimensions.length !== 3) {
+    if (!containerElement) {
+      return;
+    }
+
+    if (!volumeArray || dimensions.length !== 3) {
       setError('Missing required props');
       setIsLoading(false);
       return;
@@ -109,7 +113,7 @@ function VTKVolumeRenderer3D({
 
       // Initialize VTK.js renderer
       const fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
-        container: containerRef.current,
+        container: containerElement,
         background: backgroundColor,
       });
 
@@ -255,7 +259,7 @@ function VTKVolumeRenderer3D({
     }
 
     return cleanup;
-  }, [volumeArray, dimensions, spacing, origin, backgroundColor]);
+  }, [containerElement, volumeArray, dimensions, spacing, origin, backgroundColor]);
 
   if (error) {
     return (
@@ -299,7 +303,7 @@ function VTKVolumeRenderer3D({
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={setContainerElement} style={{ width: '100%', height: '100%' }} />
       
       {showControls && volumeInfo && (
         <div style={{
