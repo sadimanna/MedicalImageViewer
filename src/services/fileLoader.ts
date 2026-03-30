@@ -14,6 +14,11 @@ export interface LoadedFile {
   fileType: 'nifti' | 'numpy' | 'image' | 'dicom';
 }
 
+export interface LoadProgress {
+  phase: string;
+  percent?: number;
+}
+
 class FileLoaderService {
   private worker: Worker | null = null;
 
@@ -33,17 +38,20 @@ class FileLoaderService {
     this.worker = new Worker(URL.createObjectURL(blob));
   }
 
-  async loadFile(file: File): Promise<LoadedFile> {
+  async loadFile(file: File, onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     const filename = file.name.toLowerCase();
     
     try {
       if (filename.endsWith('.npy')) {
+        onProgress?.({ phase: 'Reading NumPy file…', percent: 20 });
         return await this.loadNumPyFile(file);
       } else if (filename.endsWith('.nii') || filename.endsWith('.nii.gz')) {
-        return await this.loadNiftiFile(file);
+        return await this.loadNiftiFile(file, onProgress);
       } else if (filename.endsWith('.dcm') || filename.endsWith('.dicom')) {
+        onProgress?.({ phase: 'Reading DICOM file…', percent: 20 });
         return await this.loadDicomFile(file);
       } else if (filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+        onProgress?.({ phase: 'Reading image file…', percent: 20 });
         return await this.loadImageFile(file);
       } else {
         throw new Error(`Unsupported file format: ${filename}`);
@@ -199,20 +207,29 @@ class FileLoaderService {
     });
   }
 
-  private async loadNiftiFile(file: File): Promise<LoadedFile> {
+  private async loadNiftiFile(file: File, onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.min(60, Math.round((event.loaded / event.total) * 60));
+          onProgress?.({ phase: 'Reading NIfTI file…', percent });
+        }
+      };
       reader.onload = () => {
         let arrayBuffer = reader.result as ArrayBuffer;
+        onProgress?.({ phase: 'Validating NIfTI file…', percent: 65 });
         // Decompress if needed (.nii.gz / compressed NIfTI)
         if (nifti.isCompressed(arrayBuffer)) {
           try {
+            onProgress?.({ phase: 'Decompressing .nii.gz…', percent: 75 });
             arrayBuffer = nifti.decompress(arrayBuffer);
           } catch (err) {
             reject(new Error('Failed to decompress NIfTI file: ' + err));
             return;
           }
         }
+        onProgress?.({ phase: 'Parsing NIfTI header…', percent: 85 });
         if (nifti.isNIFTI(arrayBuffer)) {
           const niftiHeader = nifti.readHeader(arrayBuffer);
           let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
@@ -297,6 +314,7 @@ class FileLoaderService {
             filename: file.name,
             fileType: 'nifti'
           });
+          onProgress?.({ phase: 'NIfTI loaded', percent: 100 });
         } else {
           reject(new Error('File is not in NIfTI format'));
         }
@@ -359,7 +377,7 @@ class FileLoaderService {
    * @param files Array of File objects
    * @returns LoadedFile with 3D volume
    */
-  async loadImageStack(files: File[]): Promise<LoadedFile> {
+  async loadImageStack(files: File[], onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     const isSupportedSlice = (name: string) => {
       const lower = name.toLowerCase();
       return (
@@ -384,6 +402,9 @@ class FileLoaderService {
 
     const slices: { data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array; width: number; height: number; fileType: string; }[] = [];
     for (const file of sortedFiles) {
+      const currentIndex = slices.length;
+      const loopPercent = Math.round((currentIndex / sortedFiles.length) * 90);
+      onProgress?.({ phase: `Loading slice ${currentIndex + 1}/${sortedFiles.length}…`, percent: loopPercent });
       const ext = file.name.toLowerCase().split('.').pop();
       let loaded;
       if (ext === 'npy') {
@@ -418,6 +439,7 @@ class FileLoaderService {
         volume[sliceOffset + i] = Number(slice.data[i]);
       }
     }
+    onProgress?.({ phase: 'Stacked volume ready', percent: 100 });
 
     return {
       data: {

@@ -8,7 +8,7 @@ import { ViewerControls } from './components/ViewerControls';
 import { useViewerStore } from './store/viewerStore';
 
 function App() {
-  const { imageFile, isLoading, error, viewMode } = useViewerStore();
+  const { imageFile, isLoading, loadingMessage, loadingProgress, error, viewMode } = useViewerStore();
 
   const renderViewer = () => {
     if (!imageFile) {
@@ -90,7 +90,10 @@ function App() {
         {isLoading && (
           <div className="loading-overlay">
             <div className="spinner">⏳</div>
-            <p>Loading medical image data…</p>
+            <p>{loadingMessage || 'Loading medical image data…'}</p>
+            {typeof loadingProgress === 'number' && (
+              <p style={{ marginTop: '0.25rem', fontFamily: 'monospace' }}>{loadingProgress}%</p>
+            )}
           </div>
         )}
       </main>

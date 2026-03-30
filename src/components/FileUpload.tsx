@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, X, FileImage, FileCode } from 'lucide-react';
 import { useViewerStore } from '../store/viewerStore';
-import { fileLoader } from '../services/fileLoader';
+import { fileLoader, type LoadProgress } from '../services/fileLoader';
 
 interface FileUploadProps {
   type: 'image' | 'mask';
@@ -13,7 +13,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
 
   const handleFileLoad = async (fileOrFiles: File | FileList | File[]) => {
     try {
-      setLoading(true);
+      setLoading(true, 'Preparing file load…', 0);
       setError(null);
       let files: File[] = [];
       if (fileOrFiles instanceof FileList) {
@@ -25,7 +25,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
       }
       if (files.length === 1) {
         console.debug('Single file upload:', files[0]);
-        const loadedFile = await fileLoader.loadFile(files[0]);
+        const loadedFile = await fileLoader.loadFile(files[0], (progress: LoadProgress) => {
+          setLoading(true, progress.phase, progress.percent ?? null);
+        });
         if (type === 'image') {
           await setImageFile(loadedFile);
         } else {
@@ -33,7 +35,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
         }
       } else if (files.length > 1) {
         console.debug('Multi-file/folder upload:', files.map(f => f.name));
-        const loadedFile = await fileLoader.loadImageStack(files);
+        const loadedFile = await fileLoader.loadImageStack(files, (progress: LoadProgress) => {
+          setLoading(true, progress.phase, progress.percent ?? null);
+        });
         if (type === 'image') {
           await setImageFile(loadedFile);
         } else {
