@@ -221,28 +221,29 @@ class FileLoaderService {
         }
       };
       reader.onload = async () => {
-        let arrayBuffer = reader.result as ArrayBuffer;
-        onProgress?.({ phase: 'Validating NIfTI file…', percent: 65 });
-        await yieldToUI();
-        // Decompress if needed (.nii.gz / compressed NIfTI)
-        if (nifti.isCompressed(arrayBuffer)) {
-          try {
-            onProgress?.({ phase: 'Decompressing .nii.gz…', percent: 75 });
-            await yieldToUI();
-            arrayBuffer = nifti.decompress(arrayBuffer);
-          } catch (err) {
-            reject(new Error('Failed to decompress NIfTI file: ' + err));
-            return;
-          }
-        }
-        onProgress?.({ phase: 'Parsing NIfTI header…', percent: 85 });
-        await yieldToUI();
-        if (nifti.isNIFTI(arrayBuffer)) {
-          const niftiHeader = nifti.readHeader(arrayBuffer);
-          let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
-          onProgress?.({ phase: 'Decoding voxel data…', percent: 92 });
+        try {
+          let arrayBuffer = reader.result as ArrayBuffer;
+          onProgress?.({ phase: 'Validating NIfTI file…', percent: 65 });
           await yieldToUI();
-          let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
+          // Decompress if needed (.nii.gz / compressed NIfTI)
+          if (nifti.isCompressed(arrayBuffer)) {
+            try {
+              onProgress?.({ phase: 'Decompressing .nii.gz…', percent: 75 });
+              await yieldToUI();
+              arrayBuffer = nifti.decompress(arrayBuffer);
+            } catch (err) {
+              reject(new Error('Failed to decompress NIfTI file: ' + err));
+              return;
+            }
+          }
+          onProgress?.({ phase: 'Parsing NIfTI header…', percent: 85 });
+          await yieldToUI();
+          if (nifti.isNIFTI(arrayBuffer)) {
+            const niftiHeader = nifti.readHeader(arrayBuffer);
+            let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
+            onProgress?.({ phase: 'Decoding voxel data…', percent: 92 });
+            await yieldToUI();
+            let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
 
           if (niftiImage instanceof ArrayBuffer) {
             // Convert ArrayBuffer to correct typed array based on datatypeCode
@@ -290,29 +291,32 @@ class FileLoaderService {
             pixelData = niftiImage as any;
           }
 
-          const dims = [
-            niftiHeader.dims[1], 
-            niftiHeader.dims[2], 
-            niftiHeader.dims[3]
-          ];
+            const dims = [
+              niftiHeader.dims[1], 
+              niftiHeader.dims[2], 
+              niftiHeader.dims[3]
+            ];
 
-          onProgress?.({ phase: 'Finalizing volume…', percent: 98 });
-          await yieldToUI();
-          
-          resolve({
-            data: {
-              pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
-              dimensions: dims as [number, number, number],
-              metadata: {
-                ...niftiHeader
-              }
-            },
-            filename: file.name,
-            fileType: 'nifti'
-          });
-          onProgress?.({ phase: 'NIfTI loaded', percent: 100 });
-        } else {
-          reject(new Error('File is not in NIfTI format'));
+            onProgress?.({ phase: 'Finalizing volume…', percent: 98 });
+            await yieldToUI();
+            
+            resolve({
+              data: {
+                pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
+                dimensions: dims as [number, number, number],
+                metadata: {
+                  ...niftiHeader
+                }
+              },
+              filename: file.name,
+              fileType: 'nifti'
+            });
+            onProgress?.({ phase: 'NIfTI loaded', percent: 100 });
+          } else {
+            reject(new Error('File is not in NIfTI format'));
+          }
+        } catch (err) {
+          reject(new Error(`Failed to parse NIfTI: ${err instanceof Error ? err.message : String(err)}`));
         }
       };
       reader.onerror = (error) => reject(error);
