@@ -286,13 +286,32 @@ class FileLoaderService {
                 pixelData = grayscale;
                 break;
               }
+              case nifti.NIFTI1.TYPE_INT64: { // 1024
+                const source = new BigInt64Array(arrayBuffer, voxelOffset, voxelCount);
+                const converted = new Float64Array(voxelCount);
+                for (let i = 0; i < voxelCount; i++) {
+                  converted[i] = Number(source[i]);
+                }
+                pixelData = converted;
+                break;
+              }
+              case nifti.NIFTI1.TYPE_UINT64: { // 2048
+                const source = new BigUint64Array(arrayBuffer, voxelOffset, voxelCount);
+                const converted = new Float64Array(voxelCount);
+                for (let i = 0; i < voxelCount; i++) {
+                  converted[i] = Number(source[i]);
+                }
+                pixelData = converted;
+                break;
+              }
               case nifti.NIFTI1.TYPE_COMPLEX64: // 32
-              case nifti.NIFTI1.TYPE_INT64: // 1024
-              case nifti.NIFTI1.TYPE_UINT64: // 2048
               case nifti.NIFTI1.TYPE_FLOAT128:
               case nifti.NIFTI1.TYPE_COMPLEX128: // 1536
               case nifti.NIFTI1.TYPE_COMPLEX256: // 1792
-                throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
+                throw new Error(
+                  `Unsupported NIfTI datatype code: ${niftiHeader.datatypeCode}. ` +
+                  'Please convert this file to float32/int16 using a preprocessing tool (e.g., nibabel).'
+                );
               default:
                 throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
             }
