@@ -1,6 +1,5 @@
 import * as nifti from 'nifti-reader-js';
 import * as dicomParser from 'dicom-parser';
-import * as pako from 'pako';
 
 export interface ImageData {
   pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
@@ -13,6 +12,11 @@ export interface LoadedFile {
   data: ImageData;
   filename: string;
   fileType: 'nifti' | 'numpy' | 'image' | 'dicom';
+}
+
+export interface LoadProgress {
+  phase: string;
+  percent?: number;
 }
 
 class FileLoaderService {
@@ -34,17 +38,20 @@ class FileLoaderService {
     this.worker = new Worker(URL.createObjectURL(blob));
   }
 
-  async loadFile(file: File): Promise<LoadedFile> {
+  async loadFile(file: File, onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     const filename = file.name.toLowerCase();
     
     try {
       if (filename.endsWith('.npy')) {
+        onProgress?.({ phase: 'Reading NumPy file…', percent: 20 });
         return await this.loadNumPyFile(file);
       } else if (filename.endsWith('.nii') || filename.endsWith('.nii.gz')) {
-        return await this.loadNiftiFile(file);
+        return await this.loadNiftiFile(file, onProgress);
       } else if (filename.endsWith('.dcm') || filename.endsWith('.dicom')) {
+        onProgress?.({ phase: 'Reading DICOM file…', percent: 20 });
         return await this.loadDicomFile(file);
       } else if (filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+        onProgress?.({ phase: 'Reading image file…', percent: 20 });
         return await this.loadImageFile(file);
       } else {
         throw new Error(`Unsupported file format: ${filename}`);
@@ -200,96 +207,135 @@ class FileLoaderService {
     });
   }
 
-  private async loadNiftiFile(file: File): Promise<LoadedFile> {
+  private async loadNiftiFile(file: File, onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        let arrayBuffer = reader.result as ArrayBuffer;
-        // Decompress if .nii.gz
-        if (file.name.toLowerCase().endsWith('.nii.gz')) {
-          try {
-            const compressed = new Uint8Array(arrayBuffer);
-            arrayBuffer = pako.inflate(compressed).buffer;
-          } catch (err) {
-            reject(new Error('Failed to decompress .nii.gz file: ' + err));
-            return;
-          }
+      const yieldToUI = () => new Promise<void>((resolveYield) => setTimeout(resolveYield, 0));
+      onProgress?.({ phase: 'Starting NIfTI load…', percent: 1 });
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.min(60, Math.round((event.loaded / event.total) * 60));
+          onProgress?.({ phase: 'Reading NIfTI file…', percent });
+        } else {
+          onProgress?.({ phase: 'Reading NIfTI file…', percent: 30 });
         }
-        if (nifti.isNIFTI(arrayBuffer)) {
-          const niftiHeader = nifti.readHeader(arrayBuffer);
-          let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
-          let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
+      };
+      reader.onload = async () => {
+        try {
+          let arrayBuffer = reader.result as ArrayBuffer;
+          onProgress?.({ phase: 'Validating NIfTI file…', percent: 65 });
+          await yieldToUI();
+          // Decompress if needed (.nii.gz / compressed NIfTI)
+          if (nifti.isCompressed(arrayBuffer)) {
+            try {
+              onProgress?.({ phase: 'Decompressing .nii.gz…', percent: 75 });
+              await yieldToUI();
+              arrayBuffer = nifti.decompress(arrayBuffer);
+            } catch (err) {
+              reject(new Error('Failed to decompress NIfTI file: ' + err));
+              return;
+            }
+          }
+          onProgress?.({ phase: 'Parsing NIfTI header…', percent: 85 });
+          await yieldToUI();
+          if (nifti.isNIFTI(arrayBuffer)) {
+            const niftiHeader = nifti.readHeader(arrayBuffer);
+            const dims: [number, number, number] = [
+              niftiHeader.dims[1],
+              niftiHeader.dims[2],
+              niftiHeader.dims[3],
+            ];
+            const voxelCount = dims[0] * dims[1] * dims[2];
+            const voxelOffset = Math.floor((niftiHeader as any).vox_offset || 0);
+            onProgress?.({ phase: 'Decoding voxel data…', percent: 92 });
+            await yieldToUI();
+            let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
 
-          if (niftiImage instanceof ArrayBuffer) {
-            // Convert ArrayBuffer to correct typed array based on datatypeCode
+            // Direct typed-array view from voxel payload to avoid heavy full-buffer copies.
             switch (niftiHeader.datatypeCode) {
               case nifti.NIFTI1.TYPE_UINT8: // 2
-                pixelData = new Uint8Array(niftiImage);
+                pixelData = new Uint8Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_INT16: // 4
-                pixelData = new Int16Array(niftiImage);
+                pixelData = new Int16Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_INT32: // 8
-                pixelData = new Int32Array(niftiImage);
+                pixelData = new Int32Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_FLOAT32: // 16
-                pixelData = new Float32Array(niftiImage);
+                pixelData = new Float32Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
-              case nifti.NIFTI1.TYPE_COMPLEX64: // 32
-                throw new Error('NIfTI complex64 data type is not supported.');
               case nifti.NIFTI1.TYPE_FLOAT64: // 64
-                pixelData = new Float64Array(niftiImage);
+                pixelData = new Float64Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
               case nifti.NIFTI1.TYPE_UINT16: // 512
-                pixelData = new Uint16Array(niftiImage);
+                pixelData = new Uint16Array(arrayBuffer, voxelOffset, voxelCount);
                 break;
-              case nifti.NIFTI1.TYPE_INT64: // 1024
-                throw new Error('NIfTI int64 data type is not supported in JavaScript.');
-              case nifti.NIFTI1.TYPE_UINT64: // 2048
-                throw new Error('NIfTI uint64 data type is not supported in JavaScript.');
-              case nifti.NIFTI1.TYPE_FLOAT128: // 128
-                throw new Error('NIfTI float128 data type is not supported in JavaScript.');
+              case nifti.NIFTI1.TYPE_INT8: // 256
+                pixelData = Float32Array.from(new Int8Array(arrayBuffer, voxelOffset, voxelCount));
+                break;
+              case nifti.NIFTI1.TYPE_UINT32: // 768
+                pixelData = Float32Array.from(new Uint32Array(arrayBuffer, voxelOffset, voxelCount));
+                break;
+              case 128: { // RGB24
+                const rgb = new Uint8Array(arrayBuffer, voxelOffset, voxelCount * 3);
+                const grayscale = new Float32Array(voxelCount);
+                for (let i = 0, j = 0; i < voxelCount; i++, j += 3) {
+                  grayscale[i] = 0.299 * rgb[j] + 0.587 * rgb[j + 1] + 0.114 * rgb[j + 2];
+                }
+                pixelData = grayscale;
+                break;
+              }
+              case nifti.NIFTI1.TYPE_INT64: { // 1024
+                const source = new BigInt64Array(arrayBuffer, voxelOffset, voxelCount);
+                const converted = new Float64Array(voxelCount);
+                for (let i = 0; i < voxelCount; i++) {
+                  converted[i] = Number(source[i]);
+                }
+                pixelData = converted;
+                break;
+              }
+              case nifti.NIFTI1.TYPE_UINT64: { // 2048
+                const source = new BigUint64Array(arrayBuffer, voxelOffset, voxelCount);
+                const converted = new Float64Array(voxelCount);
+                for (let i = 0; i < voxelCount; i++) {
+                  converted[i] = Number(source[i]);
+                }
+                pixelData = converted;
+                break;
+              }
+              case nifti.NIFTI1.TYPE_COMPLEX64: // 32
+              case nifti.NIFTI1.TYPE_FLOAT128:
               case nifti.NIFTI1.TYPE_COMPLEX128: // 1536
-                throw new Error('NIfTI complex128 data type is not supported.');
               case nifti.NIFTI1.TYPE_COMPLEX256: // 1792
-                throw new Error('NIfTI complex256 data type is not supported.');
+                throw new Error(
+                  `Unsupported NIfTI datatype code: ${niftiHeader.datatypeCode}. ` +
+                  'Please convert this file to float32/int16 using a preprocessing tool (e.g., nibabel).'
+                );
               default:
                 throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
             }
+
+            onProgress?.({ phase: 'Finalizing volume…', percent: 98 });
+            await yieldToUI();
+            
+            resolve({
+              data: {
+                pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
+                dimensions: dims as [number, number, number],
+                metadata: {
+                  ...niftiHeader
+                }
+              },
+              filename: file.name,
+              fileType: 'nifti'
+            });
+            onProgress?.({ phase: 'NIfTI loaded', percent: 100 });
           } else {
-            pixelData = niftiImage as any;
+            reject(new Error('File is not in NIfTI format'));
           }
-
-          // Log NIfTI header
-          console.log('NIfTI Header:', niftiHeader);
-          // Log pixel data stats
-          let min = Infinity, max = -Infinity;
-          for (let i = 0; i < pixelData.length; i++) {
-            const v = pixelData[i];
-            if (v < min) min = v;
-            if (v > max) max = v;
-          }
-          console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', Array.from(pixelData).slice(0, 20));
-
-          const dims = [
-            niftiHeader.dims[1], 
-            niftiHeader.dims[2], 
-            niftiHeader.dims[3]
-          ];
-          
-          resolve({
-            data: {
-              pixelData: pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
-              dimensions: dims as [number, number, number],
-              metadata: {
-                ...niftiHeader
-              }
-            },
-            filename: file.name,
-            fileType: 'nifti'
-          });
-        } else {
-          reject(new Error('File is not in NIfTI format'));
+        } catch (err) {
+          reject(new Error(`Failed to parse NIfTI: ${err instanceof Error ? err.message : String(err)}`));
         }
       };
       reader.onerror = (error) => reject(error);
@@ -350,22 +396,44 @@ class FileLoaderService {
    * @param files Array of File objects
    * @returns LoadedFile with 3D volume
    */
-  async loadImageStack(files: File[]): Promise<LoadedFile> {
-    // Sort files by name (for DICOM, could use metadata if needed)
-    const sortedFiles = files.slice().sort((a, b) => a.name.localeCompare(b.name));
+  async loadImageStack(files: File[], onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
+    const isSupportedSlice = (name: string) => {
+      const lower = name.toLowerCase();
+      return (
+        lower.endsWith('.npy') ||
+        lower.endsWith('.dcm') ||
+        lower.endsWith('.dicom') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg')
+      );
+    };
+
+    const supportedFiles = files.filter((file) => isSupportedSlice(file.name));
+    if (supportedFiles.length === 0) {
+      throw new Error('No supported slice files found in selection.');
+    }
+
+    // Natural sort preserves numerical order (slice_2 before slice_10)
+    const sortedFiles = supportedFiles.slice().sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+
     const slices: { data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array; width: number; height: number; fileType: string; }[] = [];
     for (const file of sortedFiles) {
+      const currentIndex = slices.length;
+      const loopPercent = Math.round((currentIndex / sortedFiles.length) * 90);
+      onProgress?.({ phase: `Loading slice ${currentIndex + 1}/${sortedFiles.length}…`, percent: loopPercent });
       const ext = file.name.toLowerCase().split('.').pop();
       let loaded;
       if (ext === 'npy') {
         loaded = await this.loadNumPyFile(file);
       } else if (ext === 'dcm' || ext === 'dicom') {
         loaded = await this.loadDicomFile(file);
-      } else if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
-        loaded = await this.loadImageFile(file);
       } else {
-        throw new Error(`Unsupported file format in stack: ${file.name}`);
+        loaded = await this.loadImageFile(file);
       }
+
       const dims = loaded.data.dimensions;
       slices.push({
         data: loaded.data.pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
@@ -374,40 +442,35 @@ class FileLoaderService {
         fileType: loaded.fileType
       });
     }
-    // Check all slices have the same width/height
+
     const width = slices[0].width;
     const height = slices[0].height;
-    if (!slices.every(s => s.width === width && s.height === height)) {
-      throw new Error('All slices must have the same width and height');
+    if (!slices.every((slice) => slice.width === width && slice.height === height)) {
+      throw new Error('All slices must have the same width and height to build a 3D volume.');
     }
-    // Stack slices into a 3D volume (Uint8Array for images, Uint16Array for DICOM, fallback to Float32Array)
-    let volume: Uint8Array | Uint16Array | Float32Array;
-    let dtype = 'uint8';
-    if (slices.some(s => s.data instanceof Uint16Array)) {
-      volume = new Uint16Array(width * height * slices.length);
-      dtype = 'uint16';
-    } else if (slices.some(s => s.data instanceof Float32Array)) {
-      volume = new Float32Array(width * height * slices.length);
-      dtype = 'float32';
-    } else {
-      volume = new Uint8Array(width * height * slices.length);
-    }
+
+    // Use Float32 to avoid data loss when stacking mixed integer/float slice sources.
+    const volume = new Float32Array(width * height * slices.length);
     for (let z = 0; z < slices.length; z++) {
       const slice = slices[z];
+      const sliceOffset = z * width * height;
       for (let i = 0; i < width * height; i++) {
-        (volume as any)[z * width * height + i] = slice.data[i];
+        volume[sliceOffset + i] = Number(slice.data[i]);
       }
     }
+    onProgress?.({ phase: 'Stacked volume ready', percent: 100 });
+
     return {
       data: {
         pixelData: volume,
         dimensions: [width, height, slices.length],
         metadata: {
-          stackedFrom: sortedFiles.map(f => f.name),
-          dtype
+          stackedFrom: sortedFiles.map((f) => f.name),
+          dtype: 'float32',
+          sliceCount: slices.length,
         }
       },
-      filename: `Stacked (${sortedFiles[0].name} ... ${sortedFiles[sortedFiles.length-1].name})`,
+      filename: `Stacked (${sortedFiles[0].name} ... ${sortedFiles[sortedFiles.length - 1].name})`,
       fileType: 'image'
     };
   }

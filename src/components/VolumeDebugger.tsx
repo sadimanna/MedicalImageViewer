@@ -100,7 +100,6 @@ function VolumeDebugger() {
                   initialVolumeData={testData}
                   showAdvancedControls={true}
                   onVolumeLoad={(info) => console.log('Volume loaded:', info)}
-                  onError={(error) => console.error('Volume error:', error)}
                 />
               </div>
             </div>
