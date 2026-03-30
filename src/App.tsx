@@ -1,11 +1,13 @@
 import { Analytics } from '@vercel/analytics/react';
+import { Suspense, lazy } from 'react';
 import './App.css';
 import { FileUpload } from './components/FileUpload';
-import { Renderer2D } from './components/Renderer2D';
-import { MPRViewer } from './components/MPRViewer';
-import VTKVolumeRenderer3D from './components/VTKVolumeRenderer3D';
-import { ViewerControls } from './components/ViewerControls';
 import { useViewerStore } from './store/viewerStore';
+
+const Renderer2D = lazy(() => import('./components/Renderer2D').then((module) => ({ default: module.Renderer2D })));
+const MPRViewer = lazy(() => import('./components/MPRViewer').then((module) => ({ default: module.MPRViewer })));
+const VTKVolumeRenderer3D = lazy(() => import('./components/VTKVolumeRenderer3D'));
+const ViewerControls = lazy(() => import('./components/ViewerControls').then((module) => ({ default: module.ViewerControls })));
 
 function App() {
   const { imageFile, isLoading, loadingMessage, loadingProgress, error, viewMode } = useViewerStore();
@@ -36,21 +38,31 @@ function App() {
     }
 
     if (viewMode === '2D') {
-      return <Renderer2D />;
+      return (
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading 2D viewer…</div>}>
+          <Renderer2D />
+        </Suspense>
+      );
     }
 
     if (viewMode === 'MPR') {
-      return <MPRViewer />;
+      return (
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading MPR viewer…</div>}>
+          <MPRViewer />
+        </Suspense>
+      );
     }
 
     return (
       <div style={{ width: '100%', height: '100%', minHeight: '512px' }}>
-        <VTKVolumeRenderer3D
-          volumeArray={imageFile.data.pixelData}
-          dimensions={imageFile.data.dimensions}
-          spacing={imageFile.data.spacing}
-          showControls
-        />
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading 3D viewer…</div>}>
+          <VTKVolumeRenderer3D
+            volumeArray={imageFile.data.pixelData}
+            dimensions={imageFile.data.dimensions}
+            spacing={imageFile.data.spacing}
+            showControls
+          />
+        </Suspense>
       </div>
     );
   };
@@ -77,7 +89,9 @@ function App() {
         <div className="viewer-section">
           <div className="viewer-container">{renderViewer()}</div>
           <div className="controls-sidebar">
-            <ViewerControls />
+            <Suspense fallback={<div style={{ color: '#666' }}>Loading controls…</div>}>
+              <ViewerControls />
+            </Suspense>
           </div>
         </div>
 
