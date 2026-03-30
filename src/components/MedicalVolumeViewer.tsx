@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import VTKVolumeRenderer3D from './VTKVolumeRenderer3D';
 import { useVolumeRenderer, type VolumeData } from '../hooks/useVolumeRenderer';
 
@@ -6,14 +6,12 @@ interface MedicalVolumeViewerProps {
   initialVolumeData?: VolumeData;
   showAdvancedControls?: boolean;
   onVolumeLoad?: (volumeInfo: any) => void;
-  onError?: (error: string) => void;
 }
 
 function MedicalVolumeViewer({ 
   initialVolumeData,
   showAdvancedControls = false,
-  onVolumeLoad,
-  onError 
+  onVolumeLoad
 }: MedicalVolumeViewerProps) {
   const {
     volumeData,
@@ -25,8 +23,6 @@ function MedicalVolumeViewer({
     clearVolume,
     getVolumeStats
   } = useVolumeRenderer();
-
-  const [isLoading, setIsLoading] = useState(false);
 
   // Load initial volume data if provided
   React.useEffect(() => {
@@ -42,29 +38,13 @@ function MedicalVolumeViewer({
     }
   }, [volumeInfo, onVolumeLoad]);
 
-  const handleVolumeLoad = useCallback(async (data: VolumeData) => {
-    setIsLoading(true);
-    try {
-      const success = loadVolume(data);
-      if (!success && onError) {
-        onError('Failed to load volume data');
-      }
-    } catch (error) {
-      if (onError) {
-        onError(error instanceof Error ? error.message : 'Unknown error');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadVolume, onError]);
-
-  const handleBackgroundColorChange = useCallback((color: string) => {
+  const handleBackgroundColorChange = (color: string) => {
     // Convert hex to RGB
     const r = parseInt(color.slice(1, 3), 16) / 255;
     const g = parseInt(color.slice(3, 5), 16) / 255;
     const b = parseInt(color.slice(5, 7), 16) / 255;
     updateConfig({ backgroundColor: [r, g, b] });
-  }, [updateConfig]);
+  };
 
   const volumeStats = getVolumeStats();
 
@@ -148,7 +128,6 @@ function MedicalVolumeViewer({
             <div>
               <h3>📊 No Volume Data Loaded</h3>
               <p>Load a volume to start viewing</p>
-              {isLoading && <p>🔄 Loading...</p>}
             </div>
           </div>
         ) : (

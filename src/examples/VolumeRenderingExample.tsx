@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import MedicalVolumeViewer from '../components/MedicalVolumeViewer';
-import { useVolumeRenderer, type VolumeData } from '../hooks/useVolumeRenderer';
+import { type VolumeData } from '../hooks/useVolumeRenderer';
 
 // Example: How to use VTK.js volume rendering in your medical viewer app
 
@@ -76,9 +76,7 @@ function VolumeRenderingExample() {
     console.log('Volume loaded successfully:', volumeInfo);
   }, []);
 
-  const handleError = useCallback((error: string) => {
-    console.error('Volume rendering error:', error);
-  }, []);
+
 
   return (
     <div style={{ padding: '20px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -116,10 +114,9 @@ function VolumeRenderingExample() {
       
       <div style={{ flex: 1, border: '1px solid #ddd', borderRadius: '5px' }}>
         <MedicalVolumeViewer
-          initialVolumeData={currentVolume}
+          initialVolumeData={currentVolume ?? undefined}
           showAdvancedControls={true}
           onVolumeLoad={handleVolumeLoad}
-          onError={handleError}
         />
       </div>
       

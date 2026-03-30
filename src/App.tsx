@@ -1,13 +1,71 @@
-import { useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { Suspense, lazy } from 'react';
 import './App.css';
-import VTKVolumeRenderer3D from './components/VTKVolumeRenderer3D';
-import VTKTest from './components/VTKTest';
+import { FileUpload } from './components/FileUpload';
+import { useViewerStore } from './store/viewerStore';
+
+const Renderer2D = lazy(() => import('./components/Renderer2D').then((module) => ({ default: module.Renderer2D })));
+const MPRViewer = lazy(() => import('./components/MPRViewer').then((module) => ({ default: module.MPRViewer })));
+const VTKVolumeRenderer3D = lazy(() => import('./components/VTKVolumeRenderer3D'));
+const ViewerControls = lazy(() => import('./components/ViewerControls').then((module) => ({ default: module.ViewerControls })));
 
 function App() {
-  // Use local state instead of Zustand store to avoid hook issues
-  const [viewMode, setViewMode] = useState<'2D' | 'MPR' | '3D'>('3D');
-  const [imageFile, setImageFile] = useState<any>(null);
+  const { imageFile, isLoading, loadingMessage, loadingProgress, error, viewMode } = useViewerStore();
+
+  const renderViewer = () => {
+    if (!imageFile) {
+      return (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            border: '2px dashed #ccc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#f5f5f5',
+            color: '#666',
+            textAlign: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div>
+            <h3 style={{ marginTop: 0 }}>Load medical image data to begin</h3>
+            <p style={{ marginBottom: 0 }}>Supports single volumes (NIfTI/NPY/DICOM) and 2D slice stacks.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === '2D') {
+      return (
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading 2D viewer…</div>}>
+          <Renderer2D />
+        </Suspense>
+      );
+    }
+
+    if (viewMode === 'MPR') {
+      return (
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading MPR viewer…</div>}>
+          <MPRViewer />
+        </Suspense>
+      );
+    }
+
+    return (
+      <div style={{ width: '100%', height: '100%', minHeight: '512px' }}>
+        <Suspense fallback={<div style={{ color: '#666' }}>Loading 3D viewer…</div>}>
+          <VTKVolumeRenderer3D
+            volumeArray={imageFile.data.pixelData}
+            dimensions={imageFile.data.dimensions}
+            spacing={imageFile.data.spacing}
+            showControls
+          />
+        </Suspense>
+      </div>
+    );
+  };
 
   return (
     <div className="app">
@@ -20,93 +78,38 @@ function App() {
         <div className="file-upload-section">
           <div className="upload-column">
             <h3>Image File</h3>
-            <div style={{ 
-              padding: '20px', 
-              border: '2px dashed #ccc', 
-              borderRadius: '8px',
-              textAlign: 'center',
-              backgroundColor: '#f9f9f9'
-            }}>
-              <p>File upload functionality will be restored once VTK.js is working</p>
-              <p style={{ fontSize: '12px', color: '#666' }}>
-                Currently testing VTK.js volume rendering
-              </p>
-            </div>
+            <FileUpload type="image" />
           </div>
           <div className="upload-column">
             <h3>Mask File (Optional)</h3>
-            <div style={{ 
-              padding: '20px', 
-              border: '2px dashed #ccc', 
-              borderRadius: '8px',
-              textAlign: 'center',
-              backgroundColor: '#f9f9f9'
-            }}>
-              <p>File upload functionality will be restored once VTK.js is working</p>
-              <p style={{ fontSize: '12px', color: '#666' }}>
-                Currently testing VTK.js volume rendering
-              </p>
-            </div>
+            <FileUpload type="mask" />
           </div>
         </div>
-
-
 
         <div className="viewer-section">
-          <div className="viewer-container">
-            {viewMode === '2D' && <div style={{ padding: '20px', textAlign: 'center' }}>2D Viewer - Coming Soon</div>}
-            {viewMode === 'MPR' && <div style={{ padding: '20px', textAlign: 'center' }}>MPR Viewer - Coming Soon</div>}
-            {viewMode === '3D' && imageFile && <VTKVolumeRenderer3D volumeArray={imageFile.data.pixelData} dimensions={imageFile.data.dimensions} showControls={true} />}
-            {viewMode === '3D' && !imageFile && <VTKTest />}
-          </div>
+          <div className="viewer-container">{renderViewer()}</div>
           <div className="controls-sidebar">
-            <div style={{ padding: '20px' }}>
-              <h3>View Mode</h3>
-              <button 
-                onClick={() => setViewMode('2D')}
-                style={{ 
-                  margin: '5px', 
-                  padding: '10px', 
-                  backgroundColor: viewMode === '2D' ? '#007acc' : '#f0f0f0',
-                  color: viewMode === '2D' ? 'white' : 'black',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                2D
-              </button>
-              <button 
-                onClick={() => setViewMode('MPR')}
-                style={{ 
-                  margin: '5px', 
-                  padding: '10px', 
-                  backgroundColor: viewMode === 'MPR' ? '#007acc' : '#f0f0f0',
-                  color: viewMode === 'MPR' ? 'white' : 'black',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                MPR
-              </button>
-              <button 
-                onClick={() => setViewMode('3D')}
-                style={{ 
-                  margin: '5px', 
-                  padding: '10px', 
-                  backgroundColor: viewMode === '3D' ? '#007acc' : '#f0f0f0',
-                  color: viewMode === '3D' ? 'white' : 'black',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                3D
-              </button>
-            </div>
+            <Suspense fallback={<div style={{ color: '#666' }}>Loading controls…</div>}>
+              <ViewerControls />
+            </Suspense>
           </div>
         </div>
+
+        {error && (
+          <div className="error-message">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="loading-overlay">
+            <div className="spinner">⏳</div>
+            <p>{loadingMessage || 'Loading medical image data…'}</p>
+            {typeof loadingProgress === 'number' && (
+              <p style={{ marginTop: '0.25rem', fontFamily: 'monospace' }}>{loadingProgress}%</p>
+            )}
+          </div>
+        )}
       </main>
 
       <footer className="app-footer">
