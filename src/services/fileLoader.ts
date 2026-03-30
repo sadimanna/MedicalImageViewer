@@ -210,19 +210,25 @@ class FileLoaderService {
   private async loadNiftiFile(file: File, onProgress?: (progress: LoadProgress) => void): Promise<LoadedFile> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      const yieldToUI = () => new Promise<void>((resolveYield) => setTimeout(resolveYield, 0));
+      onProgress?.({ phase: 'Starting NIfTI load…', percent: 1 });
       reader.onprogress = (event) => {
         if (event.lengthComputable) {
           const percent = Math.min(60, Math.round((event.loaded / event.total) * 60));
           onProgress?.({ phase: 'Reading NIfTI file…', percent });
+        } else {
+          onProgress?.({ phase: 'Reading NIfTI file…', percent: 30 });
         }
       };
-      reader.onload = () => {
+      reader.onload = async () => {
         let arrayBuffer = reader.result as ArrayBuffer;
         onProgress?.({ phase: 'Validating NIfTI file…', percent: 65 });
+        await yieldToUI();
         // Decompress if needed (.nii.gz / compressed NIfTI)
         if (nifti.isCompressed(arrayBuffer)) {
           try {
             onProgress?.({ phase: 'Decompressing .nii.gz…', percent: 75 });
+            await yieldToUI();
             arrayBuffer = nifti.decompress(arrayBuffer);
           } catch (err) {
             reject(new Error('Failed to decompress NIfTI file: ' + err));
@@ -230,9 +236,12 @@ class FileLoaderService {
           }
         }
         onProgress?.({ phase: 'Parsing NIfTI header…', percent: 85 });
+        await yieldToUI();
         if (nifti.isNIFTI(arrayBuffer)) {
           const niftiHeader = nifti.readHeader(arrayBuffer);
           let niftiImage = nifti.readImage(niftiHeader, arrayBuffer);
+          onProgress?.({ phase: 'Decoding voxel data…', percent: 92 });
+          await yieldToUI();
           let pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
 
           if (niftiImage instanceof ArrayBuffer) {
@@ -281,27 +290,14 @@ class FileLoaderService {
             pixelData = niftiImage as any;
           }
 
-          // Log NIfTI header
-          console.log('NIfTI Header:', niftiHeader);
-          // Log pixel data stats
-          let min = Infinity, max = -Infinity;
-          for (let i = 0; i < pixelData.length; i++) {
-            const v = pixelData[i];
-            if (v < min) min = v;
-            if (v > max) max = v;
-          }
-          const sample = [];
-          const sampleSize = Math.min(20, pixelData.length);
-          for (let i = 0; i < sampleSize; i++) {
-            sample.push(pixelData[i]);
-          }
-          console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', sample);
-
           const dims = [
             niftiHeader.dims[1], 
             niftiHeader.dims[2], 
             niftiHeader.dims[3]
           ];
+
+          onProgress?.({ phase: 'Finalizing volume…', percent: 98 });
+          await yieldToUI();
           
           resolve({
             data: {
