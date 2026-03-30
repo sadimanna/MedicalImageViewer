@@ -141,17 +141,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ type }) => {
             {/* Browse Folder Button */}
             <input
               type="file"
-              accept=".nii,.nii.gz,.gz,application/gzip,application/x-gzip,.npy,.dcm,.dicom,.png,.jpg,.jpeg"
               onChange={handleFileInput}
               style={{ display: 'none' }}
               id={`file-input-folder-${type}`}
               multiple
-              // @ts-ignore: webkitdirectory is non-standard but supported in Chrome/Edge
-              webkitdirectory="true"
-              directory="true"
+              {...({
+                webkitdirectory: '',
+                directory: '',
+                mozdirectory: ''
+              } as unknown as Record<string, string>)}
             />
             <label htmlFor={`file-input-folder-${type}`} className="browse-button">
-              Browse Folder
+              Choose Folder
             </label>
           </div>
         )}

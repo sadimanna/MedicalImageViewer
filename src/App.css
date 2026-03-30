@@ -39,8 +39,10 @@ html, body {
 .app {
   display: flex;
   flex-direction: column;
-  width: 100vw;
+  width: min(1680px, calc(100vw - 20px));
   min-width: 0;
+  margin: 10px auto;
+  gap: 8px;
   /* overflow: hidden; */
 }
 
@@ -57,6 +59,8 @@ html, body {
   justify-content: center;
   word-break: break-word;
   box-sizing: border-box;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .app-header h1 {
@@ -84,6 +88,7 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .app-footer {
@@ -94,6 +99,7 @@ html, body {
   border-top: 1px solid var(--border);
   flex-shrink: 0;
   font-size: 0.7rem;
+  border-radius: var(--radius);
 }
 
 /* File upload section - fixed height */
@@ -110,6 +116,9 @@ html, body {
   height: auto;
   min-height: unset;
   margin: 0;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
 }
 
 .upload-column {
@@ -310,6 +319,9 @@ html, body {
   min-height: 0;
   min-width: 0;
   padding: 0.125rem;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
 }
 
 .viewer-container {
