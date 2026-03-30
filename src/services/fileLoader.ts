@@ -277,10 +277,19 @@ class FileLoaderService {
               case nifti.NIFTI1.TYPE_UINT32: // 768
                 pixelData = Float32Array.from(new Uint32Array(arrayBuffer, voxelOffset, voxelCount));
                 break;
+              case 128: { // RGB24
+                const rgb = new Uint8Array(arrayBuffer, voxelOffset, voxelCount * 3);
+                const grayscale = new Float32Array(voxelCount);
+                for (let i = 0, j = 0; i < voxelCount; i++, j += 3) {
+                  grayscale[i] = 0.299 * rgb[j] + 0.587 * rgb[j + 1] + 0.114 * rgb[j + 2];
+                }
+                pixelData = grayscale;
+                break;
+              }
               case nifti.NIFTI1.TYPE_COMPLEX64: // 32
               case nifti.NIFTI1.TYPE_INT64: // 1024
               case nifti.NIFTI1.TYPE_UINT64: // 2048
-              case nifti.NIFTI1.TYPE_FLOAT128: // 128
+              case nifti.NIFTI1.TYPE_FLOAT128:
               case nifti.NIFTI1.TYPE_COMPLEX128: // 1536
               case nifti.NIFTI1.TYPE_COMPLEX256: // 1792
                 throw new Error('Unsupported NIfTI datatype code: ' + niftiHeader.datatypeCode);
