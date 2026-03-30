@@ -351,8 +351,28 @@ class FileLoaderService {
    * @returns LoadedFile with 3D volume
    */
   async loadImageStack(files: File[]): Promise<LoadedFile> {
-    // Sort files by name (for DICOM, could use metadata if needed)
-    const sortedFiles = files.slice().sort((a, b) => a.name.localeCompare(b.name));
+    const isSupportedSlice = (name: string) => {
+      const lower = name.toLowerCase();
+      return (
+        lower.endsWith('.npy') ||
+        lower.endsWith('.dcm') ||
+        lower.endsWith('.dicom') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg')
+      );
+    };
+
+    const supportedFiles = files.filter((file) => isSupportedSlice(file.name));
+    if (supportedFiles.length === 0) {
+      throw new Error('No supported slice files found in selection.');
+    }
+
+    // Natural sort preserves numerical order (slice_2 before slice_10)
+    const sortedFiles = supportedFiles.slice().sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+
     const slices: { data: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array; width: number; height: number; fileType: string; }[] = [];
     for (const file of sortedFiles) {
       const ext = file.name.toLowerCase().split('.').pop();
@@ -361,11 +381,10 @@ class FileLoaderService {
         loaded = await this.loadNumPyFile(file);
       } else if (ext === 'dcm' || ext === 'dicom') {
         loaded = await this.loadDicomFile(file);
-      } else if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
-        loaded = await this.loadImageFile(file);
       } else {
-        throw new Error(`Unsupported file format in stack: ${file.name}`);
+        loaded = await this.loadImageFile(file);
       }
+
       const dims = loaded.data.dimensions;
       slices.push({
         data: loaded.data.pixelData as Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array,
@@ -374,40 +393,34 @@ class FileLoaderService {
         fileType: loaded.fileType
       });
     }
-    // Check all slices have the same width/height
+
     const width = slices[0].width;
     const height = slices[0].height;
-    if (!slices.every(s => s.width === width && s.height === height)) {
-      throw new Error('All slices must have the same width and height');
+    if (!slices.every((slice) => slice.width === width && slice.height === height)) {
+      throw new Error('All slices must have the same width and height to build a 3D volume.');
     }
-    // Stack slices into a 3D volume (Uint8Array for images, Uint16Array for DICOM, fallback to Float32Array)
-    let volume: Uint8Array | Uint16Array | Float32Array;
-    let dtype = 'uint8';
-    if (slices.some(s => s.data instanceof Uint16Array)) {
-      volume = new Uint16Array(width * height * slices.length);
-      dtype = 'uint16';
-    } else if (slices.some(s => s.data instanceof Float32Array)) {
-      volume = new Float32Array(width * height * slices.length);
-      dtype = 'float32';
-    } else {
-      volume = new Uint8Array(width * height * slices.length);
-    }
+
+    // Use Float32 to avoid data loss when stacking mixed integer/float slice sources.
+    const volume = new Float32Array(width * height * slices.length);
     for (let z = 0; z < slices.length; z++) {
       const slice = slices[z];
+      const sliceOffset = z * width * height;
       for (let i = 0; i < width * height; i++) {
-        (volume as any)[z * width * height + i] = slice.data[i];
+        volume[sliceOffset + i] = Number(slice.data[i]);
       }
     }
+
     return {
       data: {
         pixelData: volume,
         dimensions: [width, height, slices.length],
         metadata: {
-          stackedFrom: sortedFiles.map(f => f.name),
-          dtype
+          stackedFrom: sortedFiles.map((f) => f.name),
+          dtype: 'float32',
+          sliceCount: slices.length,
         }
       },
-      filename: `Stacked (${sortedFiles[0].name} ... ${sortedFiles[sortedFiles.length-1].name})`,
+      filename: `Stacked (${sortedFiles[0].name} ... ${sortedFiles[sortedFiles.length - 1].name})`,
       fileType: 'image'
     };
   }

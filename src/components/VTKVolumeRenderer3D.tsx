@@ -86,10 +86,13 @@ function VTKVolumeRenderer3D({
 
     const cleanup = () => {
       if (contextRef.current) {
-        const { fullScreenRenderer, volume, mapper, imageData } = contextRef.current;
+        const { fullScreenRenderer, volume, mapper, imageData, dataArray, colorFunction, opacityFunction } = contextRef.current;
         if (volume) volume.delete();
         if (mapper) mapper.delete();
         if (imageData) imageData.delete();
+        if (dataArray) dataArray.delete();
+        if (colorFunction) colorFunction.delete();
+        if (opacityFunction) opacityFunction.delete();
         if (fullScreenRenderer) fullScreenRenderer.delete();
         contextRef.current = null;
       }
@@ -188,7 +191,8 @@ function VTKVolumeRenderer3D({
       const opacityFunction = vtkPiecewiseFunction.newInstance();
 
       // Create a more sophisticated transfer function
-      const range = max - min;
+      const rawRange = max - min;
+      const range = rawRange === 0 ? 1 : rawRange;
       const midPoint = min + range * 0.5;
       
       // Color transfer function (grayscale to color)
