@@ -1,6 +1,5 @@
 import * as nifti from 'nifti-reader-js';
 import * as dicomParser from 'dicom-parser';
-import * as pako from 'pako';
 
 export interface ImageData {
   pixelData: Float32Array | Uint8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
@@ -205,13 +204,12 @@ class FileLoaderService {
       const reader = new FileReader();
       reader.onload = () => {
         let arrayBuffer = reader.result as ArrayBuffer;
-        // Decompress if .nii.gz
-        if (file.name.toLowerCase().endsWith('.nii.gz')) {
+        // Decompress if needed (.nii.gz / compressed NIfTI)
+        if (nifti.isCompressed(arrayBuffer)) {
           try {
-            const compressed = new Uint8Array(arrayBuffer);
-            arrayBuffer = pako.inflate(compressed).buffer;
+            arrayBuffer = nifti.decompress(arrayBuffer);
           } catch (err) {
-            reject(new Error('Failed to decompress .nii.gz file: ' + err));
+            reject(new Error('Failed to decompress NIfTI file: ' + err));
             return;
           }
         }
@@ -243,6 +241,12 @@ class FileLoaderService {
               case nifti.NIFTI1.TYPE_UINT16: // 512
                 pixelData = new Uint16Array(niftiImage);
                 break;
+              case nifti.NIFTI1.TYPE_INT8: // 256
+                pixelData = Float32Array.from(new Int8Array(niftiImage));
+                break;
+              case nifti.NIFTI1.TYPE_UINT32: // 768
+                pixelData = Float32Array.from(new Uint32Array(niftiImage));
+                break;
               case nifti.NIFTI1.TYPE_INT64: // 1024
                 throw new Error('NIfTI int64 data type is not supported in JavaScript.');
               case nifti.NIFTI1.TYPE_UINT64: // 2048
@@ -269,7 +273,12 @@ class FileLoaderService {
             if (v < min) min = v;
             if (v > max) max = v;
           }
-          console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', Array.from(pixelData).slice(0, 20));
+          const sample = [];
+          const sampleSize = Math.min(20, pixelData.length);
+          for (let i = 0; i < sampleSize; i++) {
+            sample.push(pixelData[i]);
+          }
+          console.log('Pixel Data: length', pixelData.length, 'min', min, 'max', max, 'sample', sample);
 
           const dims = [
             niftiHeader.dims[1], 
