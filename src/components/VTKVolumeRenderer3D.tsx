@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import '@kitware/vtk.js/Rendering/Profiles/Volume';
 
-import vtkFullScreenRenderWindow from '@kitware/vtk.js/Rendering/Misc/FullScreenRenderWindow';
+import vtkGenericRenderWindow from '@kitware/vtk.js/Rendering/Misc/GenericRenderWindow';
 import vtkVolume from '@kitware/vtk.js/Rendering/Core/Volume';
 import vtkVolumeMapper from '@kitware/vtk.js/Rendering/Core/VolumeMapper';
 import vtkImageData from '@kitware/vtk.js/Common/DataModel/ImageData';
@@ -19,15 +19,22 @@ interface VTKVolumeRenderer3DProps {
   backgroundColor?: [number, number, number];
 }
 
+const DEFAULT_SPACING: [number, number, number] = [1, 1, 1];
+const DEFAULT_ORIGIN: [number, number, number] = [0, 0, 0];
+const DEFAULT_BACKGROUND: [number, number, number] = [0.1, 0.1, 0.1];
+
 function VTKVolumeRenderer3D({ 
   volumeArray, 
   dimensions, 
-  spacing = [1, 1, 1], 
-  origin = [0, 0, 0],
+  spacing,
+  origin,
   showControls = false,
-  backgroundColor = [0.1, 0.1, 0.1]
+  backgroundColor
 }: VTKVolumeRenderer3DProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const resolvedSpacing = spacing ?? DEFAULT_SPACING;
+  const resolvedOrigin = origin ?? DEFAULT_ORIGIN;
+  const resolvedBackground = backgroundColor ?? DEFAULT_BACKGROUND;
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
   const contextRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +46,11 @@ function VTKVolumeRenderer3D({
   } | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || !volumeArray || dimensions.length !== 3) {
+    if (!containerElement) {
+      return;
+    }
+
+    if (!volumeArray || dimensions.length !== 3) {
       setError('Missing required props');
       setIsLoading(false);
       return;
@@ -86,11 +97,15 @@ function VTKVolumeRenderer3D({
 
     const cleanup = () => {
       if (contextRef.current) {
-        const { fullScreenRenderer, volume, mapper, imageData } = contextRef.current;
+        const { genericRenderWindow, volume, mapper, imageData, dataArray, colorFunction, opacityFunction, cleanupResize } = contextRef.current;
+        if (cleanupResize) cleanupResize();
         if (volume) volume.delete();
         if (mapper) mapper.delete();
         if (imageData) imageData.delete();
-        if (fullScreenRenderer) fullScreenRenderer.delete();
+        if (dataArray) dataArray.delete();
+        if (colorFunction) colorFunction.delete();
+        if (opacityFunction) opacityFunction.delete();
+        if (genericRenderWindow) genericRenderWindow.delete();
         contextRef.current = null;
       }
     };
@@ -100,18 +115,21 @@ function VTKVolumeRenderer3D({
       setError(null);
 
       // Check if VTK.js is available
-      if (typeof vtkFullScreenRenderWindow === 'undefined') {
+      if (typeof vtkGenericRenderWindow === 'undefined') {
         throw new Error('VTK.js is not loaded. Please check your imports.');
       }
 
-      // Initialize VTK.js renderer
-      const fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
-        container: containerRef.current,
-        background: backgroundColor,
+      // Initialize VTK.js renderer bound to this component container
+      const genericRenderWindow = vtkGenericRenderWindow.newInstance({
+        background: resolvedBackground,
       });
+      genericRenderWindow.setContainer(containerElement);
+      genericRenderWindow.resize();
 
-      const renderer = fullScreenRenderer.getRenderer();
-      const renderWindow = fullScreenRenderer.getRenderWindow();
+      const renderer = genericRenderWindow.getRenderer();
+      const renderWindow = genericRenderWindow.getRenderWindow();
+      const handleResize = () => genericRenderWindow.resize();
+      window.addEventListener('resize', handleResize);
 
       // Set up camera controls
       const interactor = renderWindow.getInteractor();
@@ -121,8 +139,8 @@ function VTKVolumeRenderer3D({
       // Create image data from volume array
       const imageData = vtkImageData.newInstance();
       imageData.setDimensions(dimensions);
-      imageData.setSpacing(spacing);
-      imageData.setOrigin(origin);
+      imageData.setSpacing(resolvedSpacing);
+      imageData.setOrigin(resolvedOrigin);
 
       // Create data array
       const dataArray = vtkDataArray.newInstance({
@@ -188,7 +206,8 @@ function VTKVolumeRenderer3D({
       const opacityFunction = vtkPiecewiseFunction.newInstance();
 
       // Create a more sophisticated transfer function
-      const range = max - min;
+      const rawRange = max - min;
+      const range = rawRange === 0 ? 1 : rawRange;
       const midPoint = min + range * 0.5;
       
       // Color transfer function (grayscale to color)
@@ -221,7 +240,7 @@ function VTKVolumeRenderer3D({
 
       // Store context for cleanup
       contextRef.current = {
-        fullScreenRenderer,
+        genericRenderWindow,
         volume,
         mapper,
         imageData,
@@ -230,6 +249,7 @@ function VTKVolumeRenderer3D({
         opacityFunction,
         renderer,
         renderWindow,
+        cleanupResize: () => window.removeEventListener('resize', handleResize),
       };
 
       // Set volume info
@@ -251,53 +271,49 @@ function VTKVolumeRenderer3D({
     }
 
     return cleanup;
-  }, [volumeArray, dimensions, spacing, origin, backgroundColor]);
-
-  if (error) {
-    return (
-      <div style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
-        color: '#d32f2f',
-        textAlign: 'center',
-        padding: '20px'
-      }}>
-        <div>
-          <h3>❌ VTK.js Rendering Error</h3>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
-        color: '#666'
-      }}>
-        <div>
-          <h3>🔄 Loading Volume...</h3>
-          <p>Initializing VTK.js renderer</p>
-        </div>
-      </div>
-    );
-  }
+  }, [containerElement, volumeArray, dimensions, spacing, origin, backgroundColor, resolvedBackground, resolvedOrigin, resolvedSpacing]);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+    <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#111' }}>
+      <div ref={setContainerElement} style={{ width: '100%', height: '100%' }} />
+
+      {error && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(245, 245, 245, 0.92)',
+          color: '#d32f2f',
+          textAlign: 'center',
+          padding: '20px'
+        }}>
+          <div>
+            <h3>❌ VTK.js Rendering Error</h3>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {!error && isLoading && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(20, 20, 20, 0.75)',
+          color: '#fff'
+        }}>
+          <div>
+            <h3>🔄 Loading Volume...</h3>
+            <p>Initializing VTK.js renderer</p>
+          </div>
+        </div>
+      )}
       
-      {showControls && volumeInfo && (
+      {showControls && volumeInfo && !error && (
         <div style={{
           position: 'absolute',
           top: '10px',
