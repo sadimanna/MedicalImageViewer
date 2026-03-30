@@ -12,6 +12,8 @@ interface ViewerState {
   
   // Loading and error states
   isLoading: boolean;
+  loadingMessage: string | null;
+  loadingProgress: number | null;
   error: string | null;
   
   // Window/level controls (separate for image and mask)
@@ -49,7 +51,7 @@ interface ViewerActions {
   setTotalSlices: (total: number) => void;
   
   // Loading states
-  setLoading: (loading: boolean) => void;
+  setLoading: (loading: boolean, message?: string | null, progress?: number | null) => void;
   setError: (error: string | null) => void;
   
   // Window/level controls
@@ -87,6 +89,8 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set: any) => 
   currentSlice: 0,
   totalSlices: 0,
   isLoading: false,
+  loadingMessage: null,
+  loadingProgress: null,
   error: null,
   imageWindowLevel: { center: 128, width: 256 },
   maskWindowLevel: { center: 128, width: 256 },
@@ -122,6 +126,8 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set: any) => 
         totalSlices: loadedFile.data.dimensions[2] || 1,
         currentSlice: 0,
         isLoading: false,
+        loadingMessage: null,
+        loadingProgress: null,
         pan: { x: 0, y: 0 },
         zoom: 1,
       });
@@ -132,7 +138,7 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set: any) => 
         set({ viewMode: '2D' });
       }
     } catch (e: any) {
-      set({ error: e.message, isLoading: false });
+      set({ error: e.message, isLoading: false, loadingMessage: null, loadingProgress: null });
     }
   },
   
@@ -151,8 +157,12 @@ export const useViewerStore = create<ViewerState & ViewerActions>((set: any) => 
     set({ totalSlices: total });
   },
   
-  setLoading: (loading: boolean) => {
-    set({ isLoading: loading });
+  setLoading: (loading: boolean, message: string | null = null, progress: number | null = null) => {
+    set({
+      isLoading: loading,
+      loadingMessage: loading ? message : null,
+      loadingProgress: loading ? progress : null
+    });
   },
   
   setError: (error: string | null) => {
