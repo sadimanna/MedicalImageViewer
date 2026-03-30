@@ -261,51 +261,47 @@ function VTKVolumeRenderer3D({
     return cleanup;
   }, [containerElement, volumeArray, dimensions, spacing, origin, backgroundColor]);
 
-  if (error) {
-    return (
-      <div style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
-        color: '#d32f2f',
-        textAlign: 'center',
-        padding: '20px'
-      }}>
-        <div>
-          <h3>❌ VTK.js Rendering Error</h3>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
-        color: '#666'
-      }}>
-        <div>
-          <h3>🔄 Loading Volume...</h3>
-          <p>Initializing VTK.js renderer</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#111' }}>
       <div ref={setContainerElement} style={{ width: '100%', height: '100%' }} />
+
+      {error && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(245, 245, 245, 0.92)',
+          color: '#d32f2f',
+          textAlign: 'center',
+          padding: '20px'
+        }}>
+          <div>
+            <h3>❌ VTK.js Rendering Error</h3>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {!error && isLoading && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(20, 20, 20, 0.75)',
+          color: '#fff'
+        }}>
+          <div>
+            <h3>🔄 Loading Volume...</h3>
+            <p>Initializing VTK.js renderer</p>
+          </div>
+        </div>
+      )}
       
-      {showControls && volumeInfo && (
+      {showControls && volumeInfo && !error && (
         <div style={{
           position: 'absolute',
           top: '10px',
